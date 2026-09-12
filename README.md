@@ -22,11 +22,19 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   retiros), Deudas e Inversiones (estado actual), con el selector Total
   histórico / Un año / Un mes. Verificado con casos de prueba calculados a
   mano y comparados contra la lógica de `_ingresos_gastos_periodo()`.
+- 💳 Egresos — tabla de Efectivo/Visa/Mastercard (sub-tabs), con búsqueda,
+  filtro de categoría/año/mes, "ocultar no presupuestar", y para las
+  tarjetas el toggle Consumo (mes de compra) / Efectivo real (mes de pago,
+  con el corrimiento de mes al corte correspondiente). Incluye los
+  gráficos de tendencia por período y gasto por categoría y mes (Chart.js).
 
 ⏳ Todavía no portado (usá la versión de Streamlit mientras tanto):
 - El gráfico de "Tendencia de los últimos meses" al pie de Resumen
+- Dentro de Egresos: gestionar extractos (agregar/eliminar — son
+  escritura), "ver un extracto puntual" (cupo/saldo/pago de un corte), y
+  el detalle de compras en USD de Mastercard
 - 📊 Análisis, 📋 Presupuesto, 🏦 Deudas (detalle), 📈 Inversiones (detalle),
-  🏢 Estados Financieros, 💰 Ingresos, 💳 Egresos, 🧾 Facturación Electrónica,
+  🏢 Estados Financieros, 💰 Ingresos, 🧾 Facturación Electrónica,
   📑 Declaraciones de Renta
 - Cualquier operación de **escritura** (agregar/editar/borrar) — esta primera
   versión es de solo lectura

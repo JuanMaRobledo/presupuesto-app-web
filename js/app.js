@@ -9,7 +9,7 @@ const PAGINAS = {
   "📈 Inversiones": { disponible: false },
   "🏢 Estados Financieros": { disponible: false },
   "💰 Ingresos": { disponible: false },
-  "💳 Egresos": { disponible: false },
+  "💳 Egresos": { modulo: () => PaginaEgresos, disponible: true },
   "🧾 Facturación Electrónica": { disponible: false },
   "📑 Declaraciones de Renta": { disponible: false },
 };

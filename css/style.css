@@ -86,21 +86,41 @@ button {
   color: var(--text);
 }
 
-#contenido { flex: 1; padding: 24px 32px; max-width: 900px; }
+#contenido { flex: 1; padding: 24px 32px; max-width: 1100px; }
 #contenido h1 { margin-top: 0; }
 #contenido h4 { margin-top: 28px; margin-bottom: 8px; }
 .caption { color: var(--text-muted); font-size: 0.9rem; }
 
 .campo { margin: 16px 0; }
-.radio-row { display: flex; gap: 16px; margin-top: 6px; }
-.row { display: flex; gap: 8px; margin-top: 8px; }
-select {
+.radio-row { display: flex; gap: 16px; margin-top: 6px; flex-wrap: wrap; }
+.row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+select, .input-texto {
   padding: 6px 8px;
   border-radius: 6px;
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text);
+  font: inherit;
 }
+.input-texto { width: 100%; margin-top: 10px; }
+.checkbox-row { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
+
+.tabs { display: flex; gap: 4px; margin: 16px 0; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
+.tab-btn {
+  padding: 8px 14px;
+  border: none;
+  border-radius: 6px 6px 0 0;
+  background: transparent;
+  color: var(--text-muted);
+}
+.tab-btn:hover { background: var(--bg-alt); }
+.tab-btn.activo { background: var(--bg-alt); color: var(--text); font-weight: 600; }
+
+.tabla-scroll { max-height: 600px; overflow-y: auto; overflow-x: auto; margin-top: 8px; border: 1px solid var(--border); border-radius: 8px; }
+.tabla-scroll .tabla { margin-top: 0; }
+.tabla-scroll thead th { position: sticky; top: 0; background: var(--bg); }
+
+h5 { margin: 20px 0 8px; }
 
 .metric-row { display: flex; gap: 16px; flex-wrap: wrap; }
 .metric {

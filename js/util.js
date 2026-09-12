@@ -83,6 +83,17 @@ function parseFechaISO(s) {
   return null;
 }
 
+// Puerto de _shift_mes() (app_presupuesto.py) — suma 'delta' meses a un
+// 'yyyy-mm' (delta puede ser negativo).
+function shiftMes(mesStr, delta) {
+  const anio = parseInt(mesStr.slice(0, 4), 10);
+  const mes = parseInt(mesStr.slice(5, 7), 10);
+  const total = anio * 12 + (mes - 1) + delta;
+  const outAnio = Math.floor(total / 12);
+  const outMes = (((total % 12) + 12) % 12) + 1;
+  return `${outAnio}-${String(outMes).padStart(2, "0")}`;
+}
+
 // Convierte las filas crudas de un rango (array de arrays) en objetos, según
 // una lista de nombres de columna en el mismo orden que llegan de la API.
 function filasAObjetos(filas, columnas) {
