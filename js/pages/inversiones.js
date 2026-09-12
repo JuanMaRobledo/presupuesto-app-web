@@ -387,15 +387,22 @@ const PaginaInversiones = (() => {
       div.innerHTML = html;
       renderChartCrecimiento(div.querySelector(`#chart_crecimiento_${moneda}`), serieValor, serieAportes, moneda, unidad);
 
+      // Solo aportes/retiros a plataformas de bolsa de verdad (Acciones y
+      // Valores/Trii) -- "Fiducuenta (reserva impuestos)" es una cuenta de
+      // liquidez aparte (ver PLATAFORMA_FONDO_BANCO), así que un retiro ahí
+      // (p. ej. para pagar impuestos) no corresponde a ninguna baja en el
+      // valor de las acciones y no debe restar de esta base ni de su XIRR.
+      // Antes el XIRR sí mezclaba los aportes/retiros de Fiducuenta con el
+      // valor de las acciones (numerador y denominador de fuentes distintas
+      // -- el mismo tipo de error que causó el "-768%" original); esto ya
+      // quedó separado, ver "Consolidado" más abajo para la vista combinada.
+      const aportesInversion = aportesMoneda.filter((f) => f.Plataforma !== PLATAFORMA_FONDO_BANCO);
+      const posiciones = separarPosiciones(moneda === "pesos" ? datos.posicionesPesos : datos.posicionesDolares).titulos;
+      const valorTitulos = patrimonioTotal(posiciones);
+
       const metricsHtml = [];
       let avisoRentabilidad = "";
       if (moneda === "pesos" && serieValor.length) {
-        // Solo aportes/retiros a plataformas de bolsa de verdad (Acciones y
-        // Valores/Trii) -- "Fiducuenta (reserva impuestos)" es una cuenta de
-        // liquidez aparte (ver PLATAFORMA_FONDO_BANCO), así que un retiro ahí
-        // (p. ej. para pagar impuestos) no corresponde a ninguna baja en el
-        // valor de las acciones y no debe restar de esta base.
-        const aportesInversion = aportesMoneda.filter((f) => f.Plataforma !== PLATAFORMA_FONDO_BANCO);
         const serieAportesInversion = serieAcumuladaAportes(aportesInversion);
         if (serieAportesInversion.length) {
           const ultimoValor = serieValor[serieValor.length - 1].valor;
@@ -405,8 +412,7 @@ const PaginaInversiones = (() => {
           avisoRentabilidad = avisoHtml;
         }
       }
-      const posiciones = separarPosiciones(moneda === "pesos" ? datos.posicionesPesos : datos.posicionesDolares).titulos;
-      const xirrValor = rentabilidadXirr(aportesMoneda, patrimonioTotal(posiciones), moneda, datos.mercado.trm);
+      const xirrValor = rentabilidadXirr(aportesInversion, valorTitulos, moneda, datos.mercado.trm);
       if (xirrValor !== null) {
         metricsHtml.push(metric(
           moneda === "pesos" ? "Rentabilidad anualizada (XIRR)" : "Rentabilidad anualizada (XIRR, con TRM de hoy)",
@@ -414,6 +420,44 @@ const PaginaInversiones = (() => {
       }
       div.querySelector(`#crecimiento_metrics_${moneda}`).innerHTML = metricsHtml.join("");
       if (avisoRentabilidad) div.insertAdjacentHTML("beforeend", avisoRentabilidad);
+
+      // Vista consolidada (solo pesos): acciones + Fiducuenta juntos -- acá
+      // SÍ se combinan los aportes/retiros de ambas plataformas, pero
+      // emparejados con el valor combinado (títulos + Fiducuenta), no solo
+      // el de las acciones, así que no repite el error de mezclar fuentes.
+      if (moneda === "pesos") {
+        const posicionFondo = separarPosiciones(datos.posicionesPesos).liquidez
+          .find((f) => (f.TickerFondo || "").trim() === PLATAFORMA_FONDO_BANCO);
+        if (posicionFondo) {
+          const valorFondo = toNumber(posicionFondo.ValorActual);
+          const valorConsolidado = valorTitulos + valorFondo;
+          const metricsConsolidado = [];
+          let avisoConsolidado = "";
+          const serieAportesConsolidados = serieAcumuladaAportes(aportesMoneda);
+          if (serieAportesConsolidados.length) {
+            const aportesNetosConsolidados = serieAportesConsolidados[serieAportesConsolidados.length - 1].acumulado;
+            const { metricHtml, avisoHtml } = rentabilidadSimple(
+              "Rentabilidad consolidada (acciones + Fiducuenta)", valorConsolidado, aportesNetosConsolidados);
+            if (metricHtml) metricsConsolidado.push(metricHtml);
+            avisoConsolidado = avisoHtml;
+          }
+          const xirrConsolidado = rentabilidadXirr(aportesMoneda, valorConsolidado, "pesos", null);
+          if (xirrConsolidado !== null) {
+            metricsConsolidado.push(metric("Rentabilidad anualizada consolidada (XIRR)", `${(xirrConsolidado * 100).toFixed(2)}%`));
+          }
+          if (metricsConsolidado.length || avisoConsolidado) {
+            div.insertAdjacentHTML("beforeend", `
+              <h6>🔗 Consolidado (acciones + Fiducuenta)</h6>
+              <p class="caption">Junta el valor y los aportes/retiros de las acciones con los de Fiducuenta, como
+              si fuera un solo portafolio -- útil para ver el rendimiento total de tu plata en pesos, pero mezcla
+              cosas con riesgo de mercado (acciones) con una reserva de liquidez (Fiducuenta), así que conviene
+              mirar también las métricas separadas de arriba.</p>
+              ${metricsConsolidado.length ? `<div class="metric-row">${metricsConsolidado.join("")}</div>` : ""}
+              ${avisoConsolidado}
+            `);
+          }
+        }
+      }
     }
 
     const bench = datos.mercado.benchmarks[moneda];
