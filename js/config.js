@@ -32,6 +32,7 @@ const RANGOS = {
   deuda_tarjeta_usd: "'Deudas - Resumen'!A12:C12",
   posiciones_pesos: "'Inversiones - Pesos'!A5:H45",
   posiciones_dolares: "'Inversiones - Dólares'!A5:H45",
+  facturacion_electronica: "'Facturación Electrónica'!A2:H2000",
   resumen_kpis: "'Resumen'!B5:E18",
   mc_detalle_usd: "'Egresos - Mastercard 5922'!A5698:K6697",
 };

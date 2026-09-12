@@ -39,6 +39,9 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   un mes puntual, quincena por quincena) y Otros Ingresos (búsqueda,
   filtros, "ocultar no presupuestar", agrupamiento de Rendimientos
   Financieros por mes, total por categoría y gráfico).
+- 🧾 Facturación Electrónica — registro año a año, con resumen por año,
+  búsqueda por emisor, filtros de año/mes, y el link "Correo" al mail
+  original en Gmail para las facturas de la carga histórica.
 
 ⏳ Todavía no portado (usá la versión de Streamlit mientras tanto):
 - El gráfico de "Tendencia de los últimos meses" al pie de Resumen
@@ -49,9 +52,8 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
 - Dentro de Inversiones: patrimonio unificado, actualizar precios (Yahoo
   Finance), historial de operaciones del broker, Crecimiento y Rentabilidad
 - Dentro de Ingresos: agregar/eliminar una colilla o un ingreso (escritura)
-- 📊 Análisis, 📋 Presupuesto,
-  🏢 Estados Financieros, 🧾 Facturación Electrónica,
-  📑 Declaraciones de Renta
+- Dentro de Facturación Electrónica: agregar una factura a mano (escritura)
+- 📊 Análisis, 📋 Presupuesto, 🏢 Estados Financieros, 📑 Declaraciones de Renta
 - Cualquier operación de **escritura** (agregar/editar/borrar) — esta primera
   versión es de solo lectura
 
