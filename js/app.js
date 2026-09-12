@@ -11,7 +11,7 @@ const PAGINAS = {
   "💰 Ingresos": { modulo: () => PaginaIngresos, disponible: true },
   "💳 Egresos": { modulo: () => PaginaEgresos, disponible: true },
   "🧾 Facturación Electrónica": { modulo: () => PaginaFacturacion, disponible: true },
-  "📑 Declaraciones de Renta": { disponible: false },
+  "📑 Declaraciones de Renta": { modulo: () => PaginaDeclaraciones, disponible: true },
 };
 
 function construirNav() {

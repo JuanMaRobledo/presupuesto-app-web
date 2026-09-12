@@ -11,8 +11,10 @@
 const CONFIG = {
   CLIENT_ID: "289024704945-jvmttgv33s0h9aqtvghqg1hrmtsftesu.apps.googleusercontent.com",
   SHEET_ID: "1wImfL85jPWKUwbcGb6gX7Ug4-3peEiXyp0lIcroycIk",
-  // Alcance de solo lectura — esta primera versión no escribe nada al Sheet.
-  SCOPES: "https://www.googleapis.com/auth/spreadsheets.readonly",
+  // Lectura/escritura del Sheet (Declaraciones de Renta ya escribe) +
+  // drive.file: acceso SOLO a los archivos que esta app crea en Drive
+  // (el PDF de cada declaración que subís), nunca al resto de tu Drive.
+  SCOPES: "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file",
 };
 
 // Rangos con nombre que usa cada página ya portada — mismos rangos que
@@ -33,6 +35,7 @@ const RANGOS = {
   posiciones_pesos: "'Inversiones - Pesos'!A5:H45",
   posiciones_dolares: "'Inversiones - Dólares'!A5:H45",
   facturacion_electronica: "'Facturación Electrónica'!A2:H2000",
+  declaraciones_renta: "'Declaraciones de Renta'!A2:J1000",
   resumen_kpis: "'Resumen'!B5:E18",
   mc_detalle_usd: "'Egresos - Mastercard 5922'!A5698:K6697",
 };

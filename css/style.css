@@ -94,7 +94,7 @@ button {
 .campo { margin: 16px 0; }
 .radio-row { display: flex; gap: 16px; margin-top: 6px; flex-wrap: wrap; }
 .row { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
-select, .input-texto {
+select, .input-texto, input[type="number"], input[type="date"], input[type="text"], input[type="file"] {
   padding: 6px 8px;
   border-radius: 6px;
   border: 1px solid var(--border);
@@ -104,6 +104,19 @@ select, .input-texto {
 }
 .input-texto { width: 100%; margin-top: 10px; }
 .checkbox-row { display: flex; align-items: center; gap: 6px; margin-top: 12px; }
+
+#form_declaracion .row > div { flex: 1; min-width: 180px; }
+#form_declaracion input[type="number"], #form_declaracion input[type="date"] { width: 100%; margin-top: 4px; }
+#form_declaracion button[type="submit"] {
+  margin-top: 16px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background: var(--accent);
+  color: white;
+  font-weight: 600;
+}
+#form_declaracion button[type="submit"]:disabled { opacity: 0.6; }
 
 .tabs { display: flex; gap: 4px; margin: 16px 0; flex-wrap: wrap; border-bottom: 1px solid var(--border); }
 .tab-btn {

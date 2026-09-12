@@ -3,9 +3,11 @@
 Versión estática (HTML/CSS/JS puro, sin Streamlit ni backend) de
 [presupuesto-app](https://github.com/JuanMaRobledo/presupuesto-app). Corre
 enteramente en el navegador: quien la abre inicia sesión con su propia cuenta
-de Google y el navegador lee el Google Sheet directamente vía la API de
-Sheets — no hay servidor, no hay cuenta de servicio, no hay ninguna llave
-guardada en el código.
+de Google y el navegador lee (y, en Declaraciones de Renta, también escribe)
+el Google Sheet directamente vía la API de Sheets — no hay servidor, no hay
+cuenta de servicio, no hay ninguna llave guardada en el código. El PDF de
+cada declaración se sube directo a Google Drive con esa misma sesión (queda
+de tu propiedad, la app nunca lo aloja).
 
 La carpeta `streamlit-app-original/` es una copia congelada de la app de
 Streamlit (para no perder ese trabajo) — no se usa para nada acá, es solo
@@ -42,6 +44,13 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
 - 🧾 Facturación Electrónica — registro año a año, con resumen por año,
   búsqueda por emisor, filtros de año/mes, y el link "Correo" al mail
   original en Gmail para las facturas de la carga histórica.
+- 📑 Declaraciones de Renta — **con escritura**: tabla + gráfico de
+  Patrimonio Líquido/Impuesto a Cargo por año, y un formulario que sube el
+  PDF directo a tu Google Drive (o aceptá pegar un link a mano) y guarda el
+  registro en el Sheet — guardar el mismo Año reemplaza esa fila, igual que
+  `guardar_declaracion_renta()`. Es la primera sección con escritura del
+  sitio: necesita el scope completo de Sheets + `drive.file` (ver más
+  abajo).
 
 ⏳ Todavía no portado (usá la versión de Streamlit mientras tanto):
 - El gráfico de "Tendencia de los últimos meses" al pie de Resumen
@@ -53,9 +62,9 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   Finance), historial de operaciones del broker, Crecimiento y Rentabilidad
 - Dentro de Ingresos: agregar/eliminar una colilla o un ingreso (escritura)
 - Dentro de Facturación Electrónica: agregar una factura a mano (escritura)
-- 📊 Análisis, 📋 Presupuesto, 🏢 Estados Financieros, 📑 Declaraciones de Renta
-- Cualquier operación de **escritura** (agregar/editar/borrar) — esta primera
-  versión es de solo lectura
+- 📊 Análisis, 📋 Presupuesto, 🏢 Estados Financieros
+- El resto de las secciones sigue siendo de solo lectura (agregar/editar/
+  borrar) — Declaraciones de Renta es la única con escritura por ahora
 
 ## Cómo probarlo en local
 
@@ -88,13 +97,18 @@ Google de cada persona: solo quien ya tiene acceso al Sheet puede leerlo.
 1. Andá a [Google Cloud Console](https://console.cloud.google.com/apis/credentials)
    y seleccioná el mismo proyecto que ya usa `presupuesto-app`
    (`presupuesto-app-507514`).
-2. **APIs & Services → Library** → buscá "Google Sheets API" → **Enable**
-   (si no estaba ya habilitada).
+2. **APIs & Services → Library** → habilitá **"Google Sheets API"** y
+   **"Google Drive API"** (esta última hace falta desde que Declaraciones de
+   Renta sube el PDF a Drive).
 3. **APIs & Services → OAuth consent screen** → configurala como "Internal"
    si tu cuenta es de Google Workspace, o "External" + agregá tu propio
-   email en "Test users" si es una cuenta @gmail.com normal (mientras la app
-   no esté "publicada", solo vos vas a poder iniciar sesión — perfecto para
-   uso personal).
+   email (y el de cualquier otra persona que vaya a usar el sitio) en "Test
+   users" si es una cuenta @gmail.com normal (mientras la app no esté
+   "publicada", solo esos correos van a poder iniciar sesión — perfecto para
+   uso personal/familiar). `drive.file` es un scope "sensible" para Google,
+   así que en el login vas a ver una pantalla de "App no verificada" — es
+   normal para una app de uso propio en modo Testing, click en
+   "Avanzado" → "Ir a [nombre] (no seguro)" para continuar.
 4. **APIs & Services → Credentials → Create Credentials → OAuth client ID**:
    - Application type: **Web application**
    - Authorized JavaScript origins: agregá `http://localhost:8000` (para
@@ -112,7 +126,8 @@ css/style.css        — estilos
 js/config.js         — Client ID, Sheet ID, rangos con nombre
 js/util.js           — funciones puras portadas de Python (toNumber, fmtMoneda, ...)
 js/auth.js           — login/logout con Google Identity Services
-js/sheets-api.js      — wrapper sobre la API REST de Google Sheets
+js/sheets-api.js      — wrapper sobre la API REST de Google Sheets (lectura y escritura)
+js/drive-api.js       — wrapper sobre la API REST de Google Drive (subir un PDF)
 js/app.js            — nav lateral y bootstrap
 js/pages/*.js        — una página por sección, cada una expone render(container)
 ```
