@@ -47,6 +47,17 @@ SHEET_DATOS_MERCADO = "Datos de Mercado (Auto)"
 # Puerto de BENCHMARKS (app_presupuesto.py).
 BENCHMARKS = {"pesos": ("ICOLCAP.CL", "COLCAP"), "dolares": ("^GSPC", "S&P 500")}
 
+# Cuentas de efectivo/reserva, no inversiones de mercado -- mismo criterio que
+# esCuentaLiquidez() en js/pages/inversiones.js (ver el comentario ahí para
+# el porqué): ni cotizan en Yahoo ni cuentan para el snapshot de cartera.
+TIPOS_LIQUIDEZ = {"Fondo (liquidez)", "Fiducuenta"}
+
+
+def es_cuenta_liquidez(ticker, tipo):
+    if str(tipo).strip() in TIPOS_LIQUIDEZ:
+        return True
+    return str(ticker or "").strip().lower().endswith("efectivo/margen")
+
 _SHEETS_EPOCH = date(1899, 12, 30)
 
 
@@ -246,7 +257,7 @@ def main():
         posiciones_filas[moneda] = filas
         for idx, fila in enumerate(filas):
             ticker = str(fila[0] or "").strip()
-            if not ticker:
+            if not ticker or es_cuenta_liquidez(ticker, fila[1]):
                 continue
             simbolo = simbolo_cotizacion(ticker, moneda, fila[1] or "")
             if simbolo:
@@ -275,7 +286,11 @@ def main():
     # 4) Snapshot de cartera + valor shadow del benchmark, por moneda.
     shadow_por_moneda = {}
     for moneda, ws in posiciones_ws.items():
-        filas_pos = posiciones_filas[moneda]  # ya con 'Precio Actual' actualizado arriba
+        # Snapshot de cartera = solo inversiones de mercado, sin cuentas de
+        # liquidez (mismo criterio que separarPosiciones() del lado web) --
+        # así el 'Valor Actual' que alimenta Crecimiento y Rentabilidad/XIRR
+        # no queda inflado por un saldo de efectivo sin retorno de mercado.
+        filas_pos = [f for f in posiciones_filas[moneda] if not es_cuenta_liquidez(f[0], f[1])]
         valor_costo = sum(abs(_num(f[2])) * _num(f[3]) for f in filas_pos)
         valor_actual = sum(_num(f[2]) * _num(f[5]) for f in filas_pos)
 
@@ -298,7 +313,11 @@ def main():
     # 5) 'Datos de Mercado (Auto)'.
     escribir_datos_mercado(sh, trm, trm_fecha, shadow_por_moneda)
 
-    print(f"Precios actualizados: {actualizadas}. Sin cotización: {', '.join(sorted(faltantes)) or 'ninguno'}.")
+    liquidez_omitidas = [str(f[0]) for filas in posiciones_filas.values() for f in filas
+                         if f[0] and es_cuenta_liquidez(f[0], f[1])]
+    print(f"Precios actualizados: {actualizadas}. Sin cotización: {', '.join(sorted(faltantes)) or 'ninguno'}. "
+          f"Cuentas de liquidez omitidas (no cotizan, no cuentan para el snapshot): "
+          f"{', '.join(liquidez_omitidas) or 'ninguna'}.")
     print(f"TRM (USD/COP): {trm} ({trm_fecha})")
     for moneda, (valor, nombre) in shadow_por_moneda.items():
         print(f"Benchmark {moneda} ({nombre}): {valor}")

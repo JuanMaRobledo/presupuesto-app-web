@@ -20,6 +20,18 @@
 //
 // TODAVÍA NO portado: importar portafolios, _form_agregar_dividendo() y
 // _form_editar_historial() (escritura sobre el historial de operaciones).
+//
+// Cuentas de liquidez (efectivo, margen, fondos de reserva) se separan de
+// las posiciones de inversión de verdad -- ver esCuentaLiquidez() más abajo.
+// Puerto/extensión de la regla "Es efectivo/margen" que ya usa
+// _render_resumen_cartera() (app_presupuesto.py, ticker terminado en
+// " - Efectivo/Margen") + un criterio nuevo por Tipo ("Fondo (liquidez)",
+// "Fiducuenta") para las cuentas de reserva en pesos, que Python no
+// distingue en ningún lado (confirmado leyendo el código fuente: ninguna
+// función de Python filtra estos Tipos). Mezclarlas con inversiones reales
+// distorsionaba el patrimonio unificado y, sobre todo, "Rentabilidad sobre
+// aportes netos"/XIRR/comparación contra benchmark -- esas cuentas no
+// tienen retorno de mercado, solo un saldo que se actualiza a mano.
 
 const PaginaInversiones = (() => {
   const APORTE_COLS = ["Fecha", "Plataforma", "MontoTransferido", "Notas"];
@@ -34,6 +46,18 @@ const PaginaInversiones = (() => {
   // Puerto de VALOR_CARTERA_HEADERS (sheets_backend.py).
   const VALOR_CARTERA_COLS = ["Fecha", "Moneda", "ValorCosto", "ValorActual", "AportesNetos"];
   const charts = {};
+
+  // Tipos que representan un saldo de efectivo/reserva, no una inversión de
+  // mercado (ver comentario del encabezado del archivo).
+  const TIPOS_LIQUIDEZ = new Set(["Fondo (liquidez)", "Fiducuenta"]);
+  function esCuentaLiquidez(f) {
+    return TIPOS_LIQUIDEZ.has(String(f.Tipo || "").trim()) || /Efectivo\/Margen$/i.test(String(f.TickerFondo || ""));
+  }
+  function separarPosiciones(posiciones) {
+    const titulos = [], liquidez = [];
+    for (const f of posiciones) (esCuentaLiquidez(f) ? liquidez : titulos).push(f);
+    return { titulos, liquidez };
+  }
 
   // 'Datos de Mercado (Auto)' es una hoja simple de clave/valor (columna A =
   // etiqueta, B = valor) que escribe scripts/actualizar_mercado.py -- se lee
@@ -243,8 +267,13 @@ const PaginaInversiones = (() => {
   // Crecimiento y Rentabilidad (puerto de _render_crecimiento_rentabilidad())
   // ---------------------------------------------------------------------
   function renderPatrimonioUnificado(div, datos) {
-    const patrimonioPesos = patrimonioTotal(datos.posicionesPesos);
-    const patrimonioDolares = patrimonioTotal(datos.posicionesDolares);
+    const { titulos: titulosPesos, liquidez: liquidezPesos } = separarPosiciones(datos.posicionesPesos);
+    const { titulos: titulosDolares, liquidez: liquidezDolares } = separarPosiciones(datos.posicionesDolares);
+    const patrimonioPesos = patrimonioTotal(titulosPesos);
+    const patrimonioDolares = patrimonioTotal(titulosDolares);
+    const cajaPesos = patrimonioTotal(liquidezPesos);
+    const cajaDolares = patrimonioTotal(liquidezDolares);
+    const hayLiquidez = liquidezPesos.length > 0 || liquidezDolares.length > 0;
     const trm = datos.mercado.trm;
     if (trm === null) {
       div.innerHTML = `
@@ -255,11 +284,19 @@ const PaginaInversiones = (() => {
           ${metric("Pesos (COP)", fmtMoneda(patrimonioPesos))}
           ${metric("Dólares (USD)", "US$ " + patrimonioDolares.toLocaleString("en-US", { minimumFractionDigits: 2 }))}
         </div>
+        ${hayLiquidez ? `
+          <h5>💰 Efectivo, margen y cuentas de liquidez</h5>
+          <div class="metric-row">
+            ${metric("Pesos (COP)", fmtMoneda(cajaPesos))}
+            ${metric("Dólares (USD)", "US$ " + cajaDolares.toLocaleString("en-US", { minimumFractionDigits: 2 }))}
+          </div>` : ""}
       `;
       return;
     }
     const patrimonioDolaresCop = patrimonioDolares * trm;
     const total = patrimonioPesos + patrimonioDolaresCop;
+    const cajaDolaresCop = cajaDolares * trm;
+    const cajaTotalCop = cajaPesos + cajaDolaresCop;
     div.innerHTML = `
       <h4>🌎 Patrimonio total en inversiones</h4>
       <div class="metric-row">
@@ -271,6 +308,17 @@ const PaginaInversiones = (() => {
       <p class="caption">TRM $${trm.toLocaleString("en-US", { maximumFractionDigits: 2 })} COP/USD
       (${datos.mercado.trmFecha || "sin fecha"}) — la actualiza un GitHub Action programado (no en vivo desde el
       navegador: Yahoo Finance bloquea ese acceso por CORS a un sitio estático).</p>
+      ${hayLiquidez ? `
+        <h5>💰 Efectivo, margen y cuentas de liquidez</h5>
+        <p class="caption">Aparte de las inversiones de arriba — efectivo/deuda de margen en el broker y
+        reservas de liquidez (p. ej. una Fiducuenta), sin retorno de mercado. Un valor negativo es
+        financiación del broker (deuda), no una pérdida. No cuenta para "Total en inversiones" ni para las
+        métricas de rentabilidad de abajo.</p>
+        <div class="metric-row">
+          ${metric("Pesos (COP)", fmtMoneda(cajaPesos))}
+          ${metric(`Dólares → COP (TRM $${trm.toLocaleString("en-US", { maximumFractionDigits: 0 })})`, fmtMoneda(cajaDolaresCop))}
+          ${metric("Total liquidez (COP)", fmtMoneda(cajaTotalCop))}
+        </div>` : ""}
     `;
     if (total > 0) {
       charts.patrimonioPie?.destroy();
@@ -280,7 +328,7 @@ const PaginaInversiones = (() => {
           labels: ["Pesos", "Dólares (convertido)"],
           datasets: [{ data: [patrimonioPesos, patrimonioDolaresCop], backgroundColor: ["#1d4ed8", "#0d9488"] }],
         },
-        options: { responsive: true, plugins: { title: { display: true, text: "Distribución por moneda (en COP)" } } },
+        options: { responsive: true, plugins: { title: { display: true, text: "Distribución de inversiones por moneda (en COP)" } } },
       });
     }
   }
@@ -310,15 +358,25 @@ const PaginaInversiones = (() => {
       renderChartCrecimiento(div.querySelector(`#chart_crecimiento_${moneda}`), serieValor, serieAportes, moneda, unidad);
 
       const metricsHtml = [];
+      let avisoRentabilidad = "";
       if (moneda === "pesos" && serieValor.length && serieAportes.length) {
         const ultimoValor = serieValor[serieValor.length - 1].valor;
         const ultimoAporte = serieAportes[serieAportes.length - 1].acumulado;
-        if (ultimoAporte) {
+        // Si los retiros netos superan los depósitos netos (p. ej. un retiro grande para
+        // pagar impuestos), "ultimoAporte" queda negativo y (valor-aporte)/aporte da un
+        // porcentaje sin sentido (signo invertido) -- se oculta en vez de mostrar un
+        // número financiero engañoso.
+        if (ultimoAporte > 0) {
           metricsHtml.push(metric("Rentabilidad sobre aportes netos",
             `${(((ultimoValor - ultimoAporte) / ultimoAporte) * 100).toFixed(2)}%`));
+        } else if (ultimoAporte < 0) {
+          avisoRentabilidad = `<p class="caption">No se puede calcular "Rentabilidad sobre aportes netos": los
+            retiros netos (${fmtMoneda(Math.abs(ultimoAporte))}) superan los depósitos netos hasta ahora, así
+            que la fórmula (valor − aportes) / aportes no da un porcentaje interpretable. Revisá el historial
+            de aportes/retiros arriba si no esperabas esto.</p>`;
         }
       }
-      const posiciones = moneda === "pesos" ? datos.posicionesPesos : datos.posicionesDolares;
+      const posiciones = separarPosiciones(moneda === "pesos" ? datos.posicionesPesos : datos.posicionesDolares).titulos;
       const xirrValor = rentabilidadXirr(aportesMoneda, patrimonioTotal(posiciones), moneda, datos.mercado.trm);
       if (xirrValor !== null) {
         metricsHtml.push(metric(
@@ -326,11 +384,12 @@ const PaginaInversiones = (() => {
           `${(xirrValor * 100).toFixed(2)}%`));
       }
       div.querySelector(`#crecimiento_metrics_${moneda}`).innerHTML = metricsHtml.join("");
+      if (avisoRentabilidad) div.insertAdjacentHTML("beforeend", avisoRentabilidad);
     }
 
     const bench = datos.mercado.benchmarks[moneda];
     if (bench && bench.nombre) {
-      const valorReal = patrimonioTotal(moneda === "pesos" ? datos.posicionesPesos : datos.posicionesDolares);
+      const valorReal = patrimonioTotal(separarPosiciones(moneda === "pesos" ? datos.posicionesPesos : datos.posicionesDolares).titulos);
       const fmtBench = (v) => (moneda === "dolares" ? "US$ " + v.toLocaleString("en-US", { minimumFractionDigits: 2 }) : fmtMoneda(v));
       if (bench.valorShadow !== null) {
         const diferencia = valorReal - bench.valorShadow;
@@ -430,29 +489,47 @@ const PaginaInversiones = (() => {
 
   function renderPosiciones(posiciones, moneda) {
     if (!posiciones.length) return `<p>Todavía no hay posiciones cargadas.</p>`;
+    const { titulos, liquidez } = separarPosiciones(posiciones);
     const fmtVal = (v) => moneda === "USD" ? "US$ " + toNumber(v).toLocaleString("en-US", { minimumFractionDigits: 2 }) : fmtMoneda(v);
-    const costoTotal = posiciones.reduce((s, f) => s + toNumber(f.CostoTotal), 0);
-    const valorTotal = posiciones.reduce((s, f) => s + toNumber(f.ValorActual), 0);
-    return `
-      <div class="metric-row">
-        ${metric("Costo Total", fmtVal(costoTotal))}
-        ${metric("Valor Actual", fmtVal(valorTotal))}
-        ${metric("Ganancia/Pérdida", fmtVal(valorTotal - costoTotal))}
-      </div>
-      <div class="tabla-scroll" style="max-height:340px;">
-        <table class="tabla">
-          <thead><tr><th>Ticker / Fondo</th><th>Tipo</th><th>Cantidad</th><th>Precio Compra Prom.</th>
-            <th>Costo Total</th><th>Precio Actual</th><th>Valor Actual</th><th>Ganancia/Pérdida</th></tr></thead>
-          <tbody>${posiciones.map((f) => `<tr>
-            <td>${f.TickerFondo ?? ""}</td><td>${f.Tipo ?? ""}</td>
-            <td>${toNumber(f.Cantidad).toLocaleString("en-US")}</td>
-            <td>${fmtVal(f.PrecioCompra)}</td><td>${fmtVal(f.CostoTotal)}</td>
-            <td>${fmtVal(f.PrecioActual)}</td><td>${fmtVal(f.ValorActual)}</td>
-            <td>${fmtVal(f.GananciaPerdida)}</td>
-          </tr>`).join("")}</tbody>
-        </table>
-      </div>
-    `;
+    const tabla = (filas) => `
+      <table class="tabla">
+        <thead><tr><th>Ticker / Fondo</th><th>Tipo</th><th>Cantidad</th><th>Precio Compra Prom.</th>
+          <th>Costo Total</th><th>Precio Actual</th><th>Valor Actual</th><th>Ganancia/Pérdida</th></tr></thead>
+        <tbody>${filas.map((f) => `<tr>
+          <td>${f.TickerFondo ?? ""}</td><td>${f.Tipo ?? ""}</td>
+          <td>${toNumber(f.Cantidad).toLocaleString("en-US")}</td>
+          <td>${fmtVal(f.PrecioCompra)}</td><td>${fmtVal(f.CostoTotal)}</td>
+          <td>${fmtVal(f.PrecioActual)}</td><td>${fmtVal(f.ValorActual)}</td>
+          <td>${fmtVal(f.GananciaPerdida)}</td>
+        </tr>`).join("")}</tbody>
+      </table>`;
+
+    let html = "";
+    if (!titulos.length) {
+      html += `<p>Todavía no hay posiciones de inversión cargadas.</p>`;
+    } else {
+      const costoTotal = titulos.reduce((s, f) => s + toNumber(f.CostoTotal), 0);
+      const valorTotal = titulos.reduce((s, f) => s + toNumber(f.ValorActual), 0);
+      html += `
+        <div class="metric-row">
+          ${metric("Costo Total", fmtVal(costoTotal))}
+          ${metric("Valor Actual", fmtVal(valorTotal))}
+          ${metric("Ganancia/Pérdida", fmtVal(valorTotal - costoTotal))}
+        </div>
+        <div class="tabla-scroll" style="max-height:340px;">${tabla(titulos)}</div>
+      `;
+    }
+    if (liquidez.length) {
+      const valorLiquidez = liquidez.reduce((s, f) => s + toNumber(f.ValorActual), 0);
+      html += `
+        <h5>💰 Efectivo, margen y cuentas de liquidez</h5>
+        <p class="caption">Separado de las posiciones de inversión de arriba — no tiene retorno de mercado, así
+        que no cuenta para el patrimonio de inversiones ni para las métricas de rentabilidad más abajo.</p>
+        <div class="metric-row">${metric("Valor Actual", fmtVal(valorLiquidez))}</div>
+        <div class="tabla-scroll" style="max-height:200px;">${tabla(liquidez)}</div>
+      `;
+    }
+    return html;
   }
 
   // ---------------------------------------------------------------------

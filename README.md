@@ -68,7 +68,14 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   un GitHub Action programado (ver "Actualizar precios de mercado (Yahoo
   Finance)" más abajo) y esta página solo lee lo que ese Action ya dejó
   escrito en el Sheet, con degradación explícita si todavía no corrió ni
-  una vez.
+  una vez. Las cuentas de efectivo/margen/reserva (Tipo "Fondo (liquidez)"
+  o "Fiducuenta", o un ticker terminado en " - Efectivo/Margen" — sin
+  retorno de mercado) se muestran separadas de las posiciones de inversión
+  de verdad en todos lados: Posiciones, Patrimonio unificado, y no cuentan
+  para XIRR/Rentabilidad/Comparación contra benchmark. "Rentabilidad sobre
+  aportes netos" se oculta (con un aviso explicando por qué) cuando los
+  retiros netos superan los depósitos netos — dividir por un neto negativo
+  daba un porcentaje sin sentido (p. ej. "-768%").
 - 💰 Ingresos — **completo, con escritura**: sub-tabs Colillas de Pago
   (resumen histórico, tendencia por quincena, y el detalle devengos/
   descuentos tanto general como filtrado a un mes puntual, quincena por
