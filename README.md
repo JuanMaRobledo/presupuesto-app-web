@@ -79,7 +79,14 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   ningún cambio en las acciones — y de todos modos se oculta (con un aviso
   explicando por qué) si algún día los retiros de bolsa superan los
   depósitos de bolsa, para no dividir por un neto negativo y mostrar un
-  porcentaje sin sentido (el caso real que motivó esto daba "-768%").
+  porcentaje sin sentido (el caso real que motivó esto daba "-768%"). Si el
+  "Fondo de Inversión (banco)" se usa como fondo de liquidez propio (plata
+  disponible para invertir o gastar en cualquier momento, no información de
+  Streamlit), agregándolo como una posición más en 'Inversiones - Pesos'
+  (Tipo "Fondo (liquidez)") aparece en el bloque de liquidez de Posiciones
+  con su propia "Rentabilidad de Fondo de Inversión (banco)" — calculada
+  solo con los aportes/retiros de esa plataforma, sin mezclarla con la de
+  las acciones ni con el patrimonio de inversiones.
 - 💰 Ingresos — **completo, con escritura**: sub-tabs Colillas de Pago
   (resumen histórico, tendencia por quincena, y el detalle devengos/
   descuentos tanto general como filtrado a un mes puntual, quincena por

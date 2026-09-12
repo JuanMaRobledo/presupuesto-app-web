@@ -182,6 +182,25 @@ const PaginaInversiones = (() => {
     return ordenados.map((f) => { acumulado += f.monto; return { fechaISO: f.fechaISO, acumulado }; });
   }
 
+  // Rentabilidad simple = (valorActual - aportesNetos) / aportesNetos, con
+  // guarda: si aportesNetos <= 0 (retiros >= depósitos) el resultado no es
+  // un porcentaje interpretable (denominador negativo invierte el signo),
+  // así que se devuelve un aviso en vez de un número engañoso.
+  function rentabilidadSimple(etiqueta, valorActual, aportesNetos) {
+    if (aportesNetos > 0) {
+      return { metricHtml: metric(etiqueta, `${(((valorActual - aportesNetos) / aportesNetos) * 100).toFixed(2)}%`), avisoHtml: "" };
+    }
+    if (aportesNetos < 0) {
+      return {
+        metricHtml: "",
+        avisoHtml: `<p class="caption">No se puede calcular "${etiqueta}": los retiros netos
+          (${fmtMoneda(Math.abs(aportesNetos))}) superan los depósitos netos hasta ahora, así que la fórmula
+          (valor − aportes) / aportes no da un porcentaje interpretable.</p>`,
+      };
+    }
+    return { metricHtml: "", avisoHtml: "" };
+  }
+
   function serieValorCartera(historial, moneda) {
     return historial
       .filter((f) => f.Moneda === moneda)
@@ -247,7 +266,7 @@ const PaginaInversiones = (() => {
         <canvas id="chart_flujo_tiempo" height="90"></canvas>
 
         <h4>Posiciones — Pesos</h4>
-        ${renderPosiciones(datos.posicionesPesos, "COP")}
+        ${renderPosiciones(datos.posicionesPesos, "COP", datos.aportesPesos)}
         <div id="inv-crecimiento-pesos"></div>
 
         <h4>Posiciones — Dólares</h4>
@@ -381,19 +400,9 @@ const PaginaInversiones = (() => {
         if (serieAportesInversion.length) {
           const ultimoValor = serieValor[serieValor.length - 1].valor;
           const ultimoAporte = serieAportesInversion[serieAportesInversion.length - 1].acumulado;
-          // Guarda de todos modos: si algún día los retiros de bolsa (no del
-          // fondo bancario) superan los depósitos de bolsa, la fórmula
-          // (valor-aporte)/aporte con denominador negativo invierte el signo
-          // y no da un porcentaje interpretable.
-          if (ultimoAporte > 0) {
-            metricsHtml.push(metric("Rentabilidad sobre aportes netos",
-              `${(((ultimoValor - ultimoAporte) / ultimoAporte) * 100).toFixed(2)}%`));
-          } else if (ultimoAporte < 0) {
-            avisoRentabilidad = `<p class="caption">No se puede calcular "Rentabilidad sobre aportes netos": los
-              retiros netos hacia plataformas de bolsa (${fmtMoneda(Math.abs(ultimoAporte))}) superan los
-              depósitos hasta ahora, así que la fórmula (valor − aportes) / aportes no da un porcentaje
-              interpretable. Revisá el historial de aportes/retiros arriba si no esperabas esto.</p>`;
-          }
+          const { metricHtml, avisoHtml } = rentabilidadSimple("Rentabilidad sobre aportes netos", ultimoValor, ultimoAporte);
+          metricsHtml.push(metricHtml);
+          avisoRentabilidad = avisoHtml;
         }
       }
       const posiciones = separarPosiciones(moneda === "pesos" ? datos.posicionesPesos : datos.posicionesDolares).titulos;
@@ -507,7 +516,7 @@ const PaginaInversiones = (() => {
     `;
   }
 
-  function renderPosiciones(posiciones, moneda) {
+  function renderPosiciones(posiciones, moneda, aportes = null) {
     if (!posiciones.length) return `<p>Todavía no hay posiciones cargadas.</p>`;
     const { titulos, liquidez } = separarPosiciones(posiciones);
     const fmtVal = (v) => moneda === "USD" ? "US$ " + toNumber(v).toLocaleString("en-US", { minimumFractionDigits: 2 }) : fmtMoneda(v);
@@ -548,6 +557,26 @@ const PaginaInversiones = (() => {
         <div class="metric-row">${metric("Valor Actual", fmtVal(valorLiquidez))}</div>
         <div class="tabla-scroll" style="max-height:200px;">${tabla(liquidez)}</div>
       `;
+      // "Fondo de Inversión (banco)": el usuario lo usa como liquidez (plata
+      // disponible para invertir o gastar en cualquier momento), pero sigue
+      // queriendo saber cómo rinde esa plata puntual -- a diferencia de
+      // Cuenta Dinámica/Fiducuenta (sin aportes registrados aparte), esta
+      // plataforma sí tiene su propio historial de aportes/retiros
+      // (PLATAFORMA_FONDO_BANCO), así que se puede calcular una rentabilidad
+      // propia con la misma fórmula/guarda que las acciones, sin mezclarla.
+      if (aportes) {
+        const posicionFondo = liquidez.find((f) => (f.TickerFondo || "").trim() === PLATAFORMA_FONDO_BANCO);
+        if (posicionFondo) {
+          const aportesFondo = serieAcumuladaAportes(aportes.filter((f) => f.Plataforma === PLATAFORMA_FONDO_BANCO));
+          if (aportesFondo.length) {
+            const aportesNetosFondo = aportesFondo[aportesFondo.length - 1].acumulado;
+            const { metricHtml, avisoHtml } = rentabilidadSimple(
+              `Rentabilidad de ${PLATAFORMA_FONDO_BANCO}`, toNumber(posicionFondo.ValorActual), aportesNetosFondo);
+            if (metricHtml) html += `<div class="metric-row">${metricHtml}</div>`;
+            if (avisoHtml) html += avisoHtml;
+          }
+        }
+      }
     }
     return html;
   }
@@ -567,7 +596,7 @@ const PaginaInversiones = (() => {
     }
     const grupos = {};
     for (const f of hist) {
-      const key = `${f.Plataforma} ${f.Activo} ${f.Moneda}`;
+      const key = `${f.Plataforma}|||${f.Activo}|||${f.Moneda}`;
       grupos[key] = grupos[key] || { Plataforma: f.Plataforma, Activo: f.Activo, Moneda: f.Moneda, filas: [] };
       grupos[key].filas.push(f);
     }
