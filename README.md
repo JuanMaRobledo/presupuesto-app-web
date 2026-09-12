@@ -51,6 +51,10 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   `guardar_declaracion_renta()`. Es la primera sección con escritura del
   sitio: necesita el scope completo de Sheets + `drive.file` (ver más
   abajo).
+- 📊 Análisis — sub-tabs **Categorías** (gasto real histórico por categoría,
+  gráfico + tabla) y **Movimientos** (vista unificada devengado de las 7
+  fuentes: colillas devengo/descuento, Visa, Mastercard COP/USD, Cuenta de
+  ahorros y Otros Ingresos, con búsqueda/filtros y top categorías de gasto).
 
 ⏳ Todavía no portado (usá la versión de Streamlit mientras tanto):
 - El gráfico de "Tendencia de los últimos meses" al pie de Resumen
@@ -62,7 +66,9 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   Finance), historial de operaciones del broker, Crecimiento y Rentabilidad
 - Dentro de Ingresos: agregar/eliminar una colilla o un ingreso (escritura)
 - Dentro de Facturación Electrónica: agregar una factura a mano (escritura)
-- 📊 Análisis, 📋 Presupuesto, 🏢 Estados Financieros
+- Dentro de Análisis: Esenciales/No Esenciales, Evolución, Año vs. Año y
+  Balance Mensual (esta última también necesita escritura)
+- 📋 Presupuesto, 🏢 Estados Financieros
 - El resto de las secciones sigue siendo de solo lectura (agregar/editar/
   borrar) — Declaraciones de Renta es la única con escritura por ahora
 

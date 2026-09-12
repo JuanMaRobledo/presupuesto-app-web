@@ -94,6 +94,27 @@ function shiftMes(mesStr, delta) {
   return `${outAnio}-${String(outMes).padStart(2, "0")}`;
 }
 
+// Puerto de _periodo_sort_value() (sheets_backend.py) — normaliza fechas y
+// "periodos" de distintas fuentes (fecha exacta, quincena, "yyyy-mm") a un
+// timestamp comparable, para poder ordenar movimientos de fuentes distintas
+// de forma estable sin inventar una fecha de pago exacta para las colillas.
+function periodoSortValue(value) {
+  if (!value) return -8640000000000000;
+  const texto = String(value).trim().toLowerCase();
+  let m = texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])).getTime();
+  m = texto.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime();
+  m = texto.match(/^(\d{4})-(\d{1,2})$/);
+  if (m) return new Date(Number(m[1]), Number(m[2]) - 1, 1).getTime();
+  m = texto.match(/^(?:(1a|2a)\s+quincena\s+)?([a-záéíóú]{3})-(\d{4})$/);
+  if (m && MESES_ABR[m[2]]) {
+    const dia = m[1] === "2a" ? 16 : 1;
+    return new Date(Number(m[3]), MESES_ABR[m[2]] - 1, dia).getTime();
+  }
+  return -8640000000000000;
+}
+
 // Convierte las filas crudas de un rango (array de arrays) en objetos, según
 // una lista de nombres de columna en el mismo orden que llegan de la API.
 function filasAObjetos(filas, columnas) {

@@ -3,7 +3,7 @@
 // { render(container) }.
 const PAGINAS = {
   "🏠 Resumen": { modulo: () => PaginaResumen, disponible: true },
-  "📊 Análisis": { disponible: false },
+  "📊 Análisis": { modulo: () => PaginaAnalisis, disponible: true },
   "📋 Presupuesto": { disponible: false },
   "🏦 Deudas": { modulo: () => PaginaDeudas, disponible: true },
   "📈 Inversiones": { modulo: () => PaginaInversiones, disponible: true },

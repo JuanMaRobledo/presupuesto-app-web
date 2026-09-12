@@ -36,6 +36,7 @@ const RANGOS = {
   posiciones_dolares: "'Inversiones - Dólares'!A5:H45",
   facturacion_electronica: "'Facturación Electrónica'!A2:H2000",
   declaraciones_renta: "'Declaraciones de Renta'!A2:J1000",
+  resumen_categorias: "'Resumen'!B22:E39",
   resumen_kpis: "'Resumen'!B5:E18",
   mc_detalle_usd: "'Egresos - Mastercard 5922'!A5698:K6697",
 };
