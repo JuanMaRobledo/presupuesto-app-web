@@ -1,9 +1,7 @@
 // Puerto de render_ingresos() + render_ingresos_colillas() +
-// render_ingresos_otros() (app_presupuesto.py): dos sub-tabs, Colillas de
-// Pago (solo lectura) y Otros Ingresos (con agregar/eliminar).
-//
-// TODAVÍA NO portado: agregar/eliminar una quincena (colilla) — es un
-// formulario más grande, con una tabla editable de devengos/descuentos.
+// render_ingresos_otros() (app_presupuesto.py): dos sub-tabs, ambos con
+// escritura — Colillas de Pago (agregar/eliminar una quincena, con tabla
+// editable de devengos/descuentos) y Otros Ingresos (agregar/eliminar).
 
 const PaginaIngresos = (() => {
   const charts = {};
@@ -44,7 +42,7 @@ const PaginaIngresos = (() => {
       panel.innerHTML = "Cargando datos del Sheet…";
       try {
         const datos = await cargarDatos();
-        if (activo === "colillas") renderColillas(panel, datos);
+        if (activo === "colillas") renderColillas(panel, datos, renderTab);
         else renderOtrosIngresos(panel, datos, renderTab);
       } catch (err) {
         panel.innerHTML = `<div class="error">Error cargando el Sheet: ${err.message}</div>`;
@@ -58,11 +56,251 @@ const PaginaIngresos = (() => {
   // ---------------------------------------------------------------------
   // Colillas de Pago
   // ---------------------------------------------------------------------
-  function renderColillas(panel, datos) {
+  function renderColillas(panel, datos, recargar) {
+    panel.innerHTML = "";
+    renderFormAgregarColilla(panel, datos, recargar);
+    renderFormEliminarColilla(panel, datos, recargar);
+
     if (!datos.colillas.length) {
-      panel.innerHTML = "<p>Todavía no hay colillas cargadas.</p>";
+      panel.insertAdjacentHTML("beforeend", "<p>Todavía no hay colillas cargadas.</p>");
       return;
     }
+    const colillasDiv = document.createElement("div");
+    panel.appendChild(colillasDiv);
+    renderResumenColillas(colillasDiv, datos);
+  }
+
+  // ---------------------------------------------------------------------
+  // ➕ Agregar una quincena manualmente / 🗑️ Eliminar una quincena
+  // ---------------------------------------------------------------------
+  const MESES_3LETRAS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+  const DEVENGOS_CATEGORIAS_MANUAL = [
+    "Salario Base", "Recargos y Horas Extra", "Formación Continua", "Prima de Servicios",
+    "Vacaciones y Licencias", "Bonificación", "Cesantías (no presupuestar)", "Cesantías (Ingreso)",
+  ];
+  const DESCUENTOS_CATEGORIAS_MANUAL = [
+    "Ahorro", "Fondo de Empleados", "Seguros", "Deuda (Préstamo Fondo Empleados)",
+    "Deuda (Leasing Habitacional)", "Impuestos", "Aportes de Ley", "Transporte", "Cesantías (no presupuestar)",
+  ];
+  // Puerto de BLOCKS (sheets_backend.py) para clear_rows_by_key() a mano.
+  const SHEET_CP = "Colillas de Pago";
+  const COLILLAS_RESUMEN_PRIMERA_FILA = 150;
+  const COLILLAS_DEVENGOS_PRIMERA_FILA = 326;
+  const COLILLAS_DESCUENTOS_PRIMERA_FILA = 545;
+
+  function colLetra(n) {
+    return String.fromCharCode("A".charCodeAt(0) + n - 1);
+  }
+
+  // Puerto de clear_rows_by_key() (sheets_backend.py).
+  async function clearRowsByKey(rangoNombre, primeraFila, cols, keyCol, keyValue) {
+    const raw = await SheetsApi.batchGet([rangoNombre]);
+    const filas = raw[rangoNombre] || [];
+    const filasABorrar = [];
+    filas.forEach((r, i) => {
+      const val = r && r.length >= keyCol ? r[keyCol - 1] : "";
+      if (val === keyValue) filasABorrar.push(primeraFila + i);
+    });
+    if (!filasABorrar.length) return 0;
+    const colFin = colLetra(cols);
+    const ranges = filasABorrar.map((fila) => `'${SHEET_CP}'!A${fila}:${colFin}${fila}`);
+    await SheetsApi.batchClearRanges(ranges);
+    return filasABorrar.length;
+  }
+
+  function filaEditable(prefijo, categorias, categoriaDefault) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><input type="text" class="input-texto ${prefijo}-concepto" placeholder="Concepto"></td>
+      <td><select class="${prefijo}-categoria">${categorias.map((c) => `<option value="${c}" ${c === categoriaDefault ? "selected" : ""}>${c}</option>`).join("")}</select></td>
+      <td><input type="number" step="any" class="${prefijo}-valor" value="0" style="width:100%;"></td>
+      <td><button type="button" class="btn-quitar-fila">✕</button></td>
+    `;
+    tr.querySelector(".btn-quitar-fila").addEventListener("click", () => tr.remove());
+    return tr;
+  }
+
+  function leerFilasEditable(tbody, prefijo) {
+    return [...tbody.querySelectorAll("tr")].map((tr) => ({
+      concepto: tr.querySelector(`.${prefijo}-concepto`).value.trim(),
+      categoria: tr.querySelector(`.${prefijo}-categoria`).value,
+      valor: Number(tr.querySelector(`.${prefijo}-valor`).value) || 0,
+    })).filter((r) => r.concepto && r.valor > 0);
+  }
+
+  function renderFormAgregarColilla(panel, datos, recargar) {
+    const div = document.createElement("div");
+    const hoy = new Date();
+    const anios = [];
+    for (let a = 2023; a <= 2032; a++) anios.push(a);
+    const meses = Array.from({ length: 12 }, (_, i) => i + 1);
+    div.innerHTML = `
+      <details>
+        <summary>➕ Agregar una quincena manualmente</summary>
+        <p class="caption">Alternativa a subir el PDF: escribí la fecha de pago, la quincena, y cada devengo y
+        descuento con su categoría y valor — agregá o quitá filas con los botones de la tabla.</p>
+        <form id="form_agregar_colilla">
+          <div class="row">
+            <div><label>Año</label><br><select id="col_anio">${anios.map((a) => `<option value="${a}" ${a === hoy.getFullYear() ? "selected" : ""}>${a}</option>`).join("")}</select></div>
+            <div><label>Mes</label><br><select id="col_mes">${meses.map((m) => `<option value="${m}" ${m === hoy.getMonth() + 1 ? "selected" : ""}>${String(m).padStart(2, "0")} - ${MESES_NOMBRE[m]}</option>`).join("")}</select></div>
+            <div><label>Quincena</label><br><select id="col_quincena"><option value="1a">1a</option><option value="2a">2a</option></select></div>
+          </div>
+          <div class="campo"><label>Fecha de pago</label><br><input type="date" id="col_fechapago" required></div>
+          <p class="caption">Periodo: <strong id="col_periodo_preview"></strong></p>
+
+          <p><strong>Devengos</strong></p>
+          <table class="tabla">
+            <thead><tr><th>Concepto</th><th>Categoría</th><th>Valor</th><th></th></tr></thead>
+            <tbody id="col_dev_tbody"></tbody>
+          </table>
+          <button type="button" id="col_dev_agregar">+ Agregar fila</button>
+
+          <p><strong>Descuentos</strong></p>
+          <table class="tabla">
+            <thead><tr><th>Concepto</th><th>Categoría</th><th>Valor</th><th></th></tr></thead>
+            <tbody id="col_desc_tbody"></tbody>
+          </table>
+          <button type="button" id="col_desc_agregar">+ Agregar fila</button>
+
+          <br><br>
+          <button type="submit" id="col_guardar">💾 Guardar quincena</button>
+        </form>
+        <div class="aviso" id="col_msg" hidden></div>
+      </details>
+    `;
+    panel.appendChild(div);
+
+    const anioSel = div.querySelector("#col_anio");
+    const mesSel = div.querySelector("#col_mes");
+    const quincenaSel = div.querySelector("#col_quincena");
+    const periodoPreview = div.querySelector("#col_periodo_preview");
+    function actualizarPeriodoPreview() {
+      const mesNum = Number(mesSel.value);
+      periodoPreview.textContent = `${quincenaSel.value} quincena ${MESES_3LETRAS[mesNum - 1]}-${anioSel.value}`;
+    }
+    [anioSel, mesSel, quincenaSel].forEach((el) => el.addEventListener("change", actualizarPeriodoPreview));
+    actualizarPeriodoPreview();
+    div.querySelector("#col_fechapago").valueAsDate = hoy;
+
+    const devTbody = div.querySelector("#col_dev_tbody");
+    const descTbody = div.querySelector("#col_desc_tbody");
+    devTbody.appendChild(filaEditable("dev", DEVENGOS_CATEGORIAS_MANUAL, "Salario Base"));
+    descTbody.appendChild(filaEditable("desc", DESCUENTOS_CATEGORIAS_MANUAL, "Ahorro"));
+    div.querySelector("#col_dev_agregar").addEventListener("click", () => devTbody.appendChild(filaEditable("dev", DEVENGOS_CATEGORIAS_MANUAL, "Salario Base")));
+    div.querySelector("#col_desc_agregar").addEventListener("click", () => descTbody.appendChild(filaEditable("desc", DESCUENTOS_CATEGORIAS_MANUAL, "Ahorro")));
+
+    div.querySelector("#form_agregar_colilla").addEventListener("submit", (ev) => onGuardarColilla(ev, div, datos, recargar));
+  }
+
+  async function onGuardarColilla(ev, div, datos, recargar) {
+    ev.preventDefault();
+    const msg = div.querySelector("#col_msg");
+    const btn = div.querySelector("#col_guardar");
+    const anio = Number(div.querySelector("#col_anio").value);
+    const mes = Number(div.querySelector("#col_mes").value);
+    const quincena = div.querySelector("#col_quincena").value;
+    const periodo = `${quincena} quincena ${MESES_3LETRAS[mes - 1]}-${anio}`;
+    const fechaPago = div.querySelector("#col_fechapago").value;
+
+    const devengosValidos = leerFilasEditable(div.querySelector("#col_dev_tbody"), "dev");
+    const descuentosValidos = leerFilasEditable(div.querySelector("#col_desc_tbody"), "desc");
+
+    if (datos.colillas.some((f) => f.Periodo === periodo)) {
+      mostrarMsg(msg, `Ya existe una quincena para '${periodo}' — editala directo en el Sheet si
+        necesitás corregirla, no puedo agregar otra para el mismo período.`, true);
+      return;
+    }
+    if (!devengosValidos.length && !descuentosValidos.length) {
+      mostrarMsg(msg, "Agregá al menos un devengo o un descuento con concepto y valor.", true);
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Guardando…";
+    try {
+      const totalDevengos = devengosValidos.reduce((s, r) => s + r.valor, 0);
+      const totalDescuentos = descuentosValidos.reduce((s, r) => s + r.valor, 0);
+      await SheetsApi.appendRows(RANGOS.colillas_resumen, [[fechaPago, periodo, totalDevengos, totalDescuentos]]);
+      if (devengosValidos.length) {
+        await SheetsApi.appendRows(RANGOS.colillas_devengos, devengosValidos.map((r) => [periodo, r.concepto, r.categoria, r.valor]));
+      }
+      if (descuentosValidos.length) {
+        await SheetsApi.appendRows(RANGOS.colillas_descuentos, descuentosValidos.map((r) => [periodo, r.concepto, r.categoria, r.valor]));
+      }
+      mostrarMsg(msg, `Quincena '${periodo}' agregada.`, false);
+      await recargar();
+    } catch (err) {
+      mostrarMsg(msg, `No pude guardar: ${err.message}`, true);
+      console.error(err);
+      btn.disabled = false;
+      btn.textContent = "💾 Guardar quincena";
+    }
+  }
+
+  function renderFormEliminarColilla(panel, datos, recargar) {
+    const div = document.createElement("div");
+    if (!datos.colillas.length) {
+      div.innerHTML = `<details><summary>🗑️ Eliminar una quincena</summary><p>Todavía no hay quincenas cargadas.</p></details>`;
+      panel.appendChild(div);
+      return;
+    }
+    const periodos = datos.colillas.map((f) => f.Periodo);
+    div.innerHTML = `
+      <details>
+        <summary>🗑️ Eliminar una quincena</summary>
+        <div class="campo"><label>Quincena a eliminar</label><br>
+          <select id="del_col_periodo">${periodos.map((p) => `<option value="${p}">${p}</option>`).join("")}</select></div>
+        <p class="caption" id="del_col_caption"></p>
+        <label class="checkbox-row"><input type="checkbox" id="del_col_confirmar">
+          Confirmo que quiero borrar esta quincena — no se puede deshacer</label>
+        <button type="button" id="del_col_btn" disabled>🗑️ Eliminar quincena</button>
+        <div class="aviso" id="del_col_msg" hidden></div>
+      </details>
+    `;
+    panel.appendChild(div);
+
+    const periodoSel = div.querySelector("#del_col_periodo");
+    const caption = div.querySelector("#del_col_caption");
+    const confirmar = div.querySelector("#del_col_confirmar");
+    const btn = div.querySelector("#del_col_btn");
+
+    function actualizarCaption() {
+      const p = periodoSel.value;
+      const fila = datos.colillas.find((f) => f.Periodo === p);
+      const nDev = datos.devengos.filter((d) => d.Quincena === p).length;
+      const nDesc = datos.descuentos.filter((d) => d.Quincena === p).length;
+      caption.textContent = `Devengos: ${fmtMoneda(toNumber(fila && fila.DevengosTotales))} (${nDev} línea(s)) — `
+        + `Descuentos: ${fmtMoneda(toNumber(fila && fila.DescuentosTotales))} (${nDesc} línea(s))`;
+      confirmar.checked = false;
+      btn.disabled = true;
+    }
+    periodoSel.addEventListener("change", actualizarCaption);
+    confirmar.addEventListener("change", () => { btn.disabled = !confirmar.checked; });
+    btn.addEventListener("click", () => onEliminarColilla(div, periodoSel.value, recargar));
+    actualizarCaption();
+  }
+
+  async function onEliminarColilla(div, periodo, recargar) {
+    const msg = div.querySelector("#del_col_msg");
+    const btn = div.querySelector("#del_col_btn");
+    btn.disabled = true;
+    btn.textContent = "Borrando…";
+    try {
+      const resumenBorradas = await clearRowsByKey("colillas_resumen", COLILLAS_RESUMEN_PRIMERA_FILA, 7, 2, periodo);
+      const devengosBorradas = await clearRowsByKey("colillas_devengos", COLILLAS_DEVENGOS_PRIMERA_FILA, 4, 1, periodo);
+      const descuentosBorradas = await clearRowsByKey("colillas_descuentos", COLILLAS_DESCUENTOS_PRIMERA_FILA, 4, 1, periodo);
+      mostrarMsg(msg, `'${periodo}' eliminada — ${resumenBorradas} fila(s) de resumen, ${devengosBorradas} de
+        devengos, ${descuentosBorradas} de descuentos.`, false);
+      await recargar();
+    } catch (err) {
+      mostrarMsg(msg, `No pude borrar: ${err.message}`, true);
+      console.error(err);
+      btn.disabled = false;
+      btn.textContent = "🗑️ Eliminar quincena";
+    }
+  }
+
+  function renderResumenColillas(panel, datos) {
     const colillas = datos.colillas.map((f) => {
       const [anio, mes] = extraerAnioMes(f.Periodo);
       return { ...f, _anio: anio, _mes: mes };
