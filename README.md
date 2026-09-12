@@ -87,10 +87,16 @@ GitHub Pages abre esa portada.
   mostrar un porcentaje sin sentido (el caso real que motivó esto daba
   "-768%"). Esa cuenta tiene su propia fila en Posiciones (Tipo
   "Fiducuenta", en el bloque de liquidez) y su propia "Rentabilidad de
-  Fiducuenta (reserva impuestos)" — calculada solo con los aportes/retiros
-  de esa plataforma (reconstruidos y verificados mes a mes contra los
-  extractos oficiales de Bancolombia de nov-2024 a ago-2026), sin mezclarla
-  con la de las acciones ni con el patrimonio de inversiones.
+  Fiducuenta (reserva impuestos)" (más su XIRR, que sigue dando un número
+  interpretable aunque los retiros superen los aportes, a diferencia de la
+  rentabilidad simple) — calculada solo con los aportes/retiros de esa
+  plataforma (reconstruidos y verificados mes a mes contra los extractos
+  oficiales de Bancolombia de nov-2024 a ago-2026), sin mezclarla con la de
+  las acciones ni con el patrimonio de inversiones. Además de las métricas
+  separadas, hay una sección "🔗 Consolidado (acciones + Fiducuenta)" que sí
+  junta el valor y los aportes de ambas para quien quiera ver el
+  rendimiento total en pesos en un solo número (con su propio aviso si el
+  neto combinado da negativo).
 - 💰 Ingresos — **completo, con escritura**: sub-tabs Colillas de Pago
   (resumen histórico, tendencia por quincena, y el detalle devengos/
   descuentos tanto general como filtrado a un mes puntual, quincena por
