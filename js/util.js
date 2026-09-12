@@ -67,6 +67,25 @@ function serialToText(v) {
   return v;
 }
 
+// Igual que serialToText() pero a 'yyyy-mm-dd' — para precargar un
+// <input type="date"> con un valor que llegó como número de serie.
+function serialToISO(v) {
+  if (typeof v !== "number") return null;
+  const epochUTC = Date.UTC(1899, 11, 30);
+  const d = new Date(epochUTC + v * 86400000);
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
+}
+
+// Puerto de _date_to_serial() (sheets_backend.py) — inverso de
+// serialToText()/serialToISO(), para escribir una fecha con
+// valueInputOption RAW sin que Sheets la reinterprete distinto según el
+// locale. 'iso' es 'yyyy-mm-dd' (el valor crudo de un <input type="date">).
+function dateToSerial(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const epochUTC = Date.UTC(1899, 11, 30);
+  return Math.round((Date.UTC(y, m - 1, d) - epochUTC) / 86400000);
+}
+
 // Puerto de _extraer_anio_mes() (app_presupuesto.py) — de un 'Periodo' o
 // 'Fecha' saca [año, mes]; [null, null] si el formato no matchea ninguno de
 // los patrones conocidos (dd/mm/yyyy, yyyy-mm-dd, yyyy-mm, "1a quincena jul-2026").

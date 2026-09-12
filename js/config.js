@@ -41,4 +41,8 @@ const RANGOS = {
   presupuesto: "'Presupuesto'!A5:E63",
   resumen_kpis: "'Resumen'!B5:E18",
   mc_detalle_usd: "'Egresos - Mastercard 5922'!A5698:K6697",
+  deuda_bancolombia: "'Deuda - Bancolombia'!B6:B17",
+  deuda_sufi: "'Deuda - Sufi'!B6:B17",
+  deuda_scotiabank: "'Deuda - Scotiabank Colpatria'!B6:B17",
+  deuda_fondo_empleados: "'Deuda - Fondo de Empleados'!B6:B17",
 };

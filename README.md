@@ -29,9 +29,14 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   tarjetas el toggle Consumo (mes de compra) / Efectivo real (mes de pago,
   con el corrimiento de mes al corte correspondiente). Incluye los
   gráficos de tendencia por período y gasto por categoría y mes (Chart.js).
-- 🏦 Deudas — tarjetas de saldo total/cuota mensual, deuda de Mastercard en
-  dólares aparte, torta de participación por entidad, tabla completa y
-  gráfico de cuota mensual por entidad.
+- 🏦 Deudas — **con escritura**: tarjetas de saldo total/cuota mensual, deuda
+  de Mastercard en dólares aparte, torta de participación por entidad,
+  tabla completa y gráfico de cuota mensual por entidad, más el formulario
+  "✏️ Actualizar deudas manualmente" (4 tabs, uno por crédito con cuota
+  fija — Bancolombia, Sufi, Scotiabank y Fondo de Empleados; ninguno tiene
+  extracto automático). Los campos numéricos en 0 y el N° de Obligación
+  vacío no se guardan, para no pisar lo que ya había con un cero — mismo
+  comportamiento que `_form_actualizar_deuda()`.
 - 📈 Inversiones — aportes/retiros en pesos y dólares (métricas + tabla),
   depósitos y retiros por plataforma, capital neto transferido en el
   tiempo, y posiciones (cantidad, precio, valor de mercado,
@@ -78,7 +83,6 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
 - Dentro de Egresos: gestionar extractos (agregar/eliminar — son
   escritura), "ver un extracto puntual" (cupo/saldo/pago de un corte), y
   el detalle de compras en USD de Mastercard
-- Dentro de Deudas: el formulario "Actualizar deudas manualmente" (escritura)
 - Dentro de Inversiones: patrimonio unificado, actualizar precios (Yahoo
   Finance), historial de operaciones del broker, Crecimiento y Rentabilidad
 - Dentro de Ingresos: agregar/eliminar una colilla (quincena) — es un
