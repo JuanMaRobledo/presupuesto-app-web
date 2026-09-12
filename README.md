@@ -14,6 +14,10 @@ Streamlit (para no perder ese trabajo) — no se usa para nada acá, es solo
 referencia/backup. La versión de Streamlit sigue viva y desplegada en
 [presupuesto-app-jmr.streamlit.app](https://presupuesto-app-jmr.streamlit.app).
 
+`index.html` es una portada simple con dos tarjetas para elegir entre esta
+versión (`app.html`, la app en sí) y la de Streamlit — la URL raíz de
+GitHub Pages abre esa portada.
+
 ## Estado de la migración
 
 ✅ Portado:
@@ -278,7 +282,8 @@ Google de cada persona: solo quien ya tiene acceso al Sheet puede leerlo.
 ## Estructura
 
 ```
-index.html          — shell de la página (login + nav + contenedor)
+index.html          — portada: elegí entre la versión Web (app.html) y la de Streamlit
+app.html             — shell de la app en sí (login + nav + contenedor)
 css/style.css        — estilos
 js/config.js         — Client ID, Sheet ID, rangos con nombre
 js/util.js           — funciones puras portadas de Python (toNumber, fmtMoneda, ...)
@@ -297,4 +302,4 @@ scripts/actualizar_mercado.py — GitHub Action: precios/TRM/benchmarks vía
 
 Para portar una página nueva: agregar sus rangos a `RANGOS` en `config.js`,
 crear `js/pages/<nombre>.js` siguiendo el patrón de `resumen.js`, sumarla al
-`<script>` en `index.html` y a `PAGINAS` en `app.js` con `disponible: true`.
+`<script>` en `app.html` y a `PAGINAS` en `app.js` con `disponible: true`.

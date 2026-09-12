@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>💰 Presupuesto App (web)</title>
+  <link rel="icon" href="data:," />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="pantalla-login">
+    <h1>💰 Presupuesto App</h1>
+    <p>
+      Versión web estática (sin Streamlit) — en construcción. Iniciá sesión con la misma cuenta de Google
+      que tiene acceso al Sheet de presupuesto para ver tus datos.
+    </p>
+    <button id="btn-login">Iniciar sesión con Google</button>
+  </div>
+
+  <div id="app">
+    <div id="sidebar">
+      <h2>💰 Presupuesto</h2>
+      <p class="caption">Los datos se leen en vivo de tu Google Sheet.</p>
+      <div id="nav-paginas"></div>
+      <button id="btn-logout">Cerrar sesión</button>
+    </div>
+    <div id="contenido"></div>
+  </div>
+
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/sheets-api.js"></script>
+  <script src="js/drive-api.js"></script>
+  <script src="js/ingresos-gastos.js"></script>
+  <script src="js/pages/resumen.js"></script>
+  <script src="js/pages/analisis.js"></script>
+  <script src="js/pages/estados-financieros.js"></script>
+  <script src="js/pages/presupuesto.js"></script>
+  <script src="js/pages/egresos.js"></script>
+  <script src="js/pages/deudas.js"></script>
+  <script src="js/pages/inversiones.js"></script>
+  <script src="js/pages/ingresos.js"></script>
+  <script src="js/pages/facturacion.js"></script>
+  <script src="js/pages/declaraciones.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

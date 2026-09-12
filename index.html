@@ -3,48 +3,101 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>💰 Presupuesto App (web)</title>
+  <title>💰 Presupuesto Personal</title>
   <link rel="icon" href="data:," />
-  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #ffffff;
+      --bg-alt: #f5f5f7;
+      --text: #1a1a1a;
+      --text-muted: #6b6b6b;
+      --accent: #d64545;
+      --accent-2: #4573d6;
+      --border: #e2e2e2;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #16171a;
+        --bg-alt: #212226;
+        --text: #f0f0f0;
+        --text-muted: #a0a0a0;
+        --border: #3a3b3f;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 28px;
+      padding: 24px 16px;
+      font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      text-align: center;
+    }
+    h1 { margin: 0; font-size: 1.6rem; }
+    p.caption { margin: 0; color: var(--text-muted); max-width: 480px; }
+    .opciones {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: center;
+      width: 100%;
+      max-width: 720px;
+    }
+    a.tarjeta {
+      flex: 1 1 280px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 28px 24px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--bg-alt);
+      color: inherit;
+      text-decoration: none;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+    a.tarjeta:hover { transform: translateY(-2px); border-color: var(--accent); }
+    .tarjeta .emoji { font-size: 2rem; }
+    .tarjeta h2 { margin: 0; font-size: 1.15rem; }
+    .tarjeta p { margin: 0; color: var(--text-muted); font-size: 0.92rem; }
+    .tarjeta .etiqueta {
+      margin-top: 6px;
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+    .tarjeta.web .etiqueta { color: var(--accent); }
+    .tarjeta.streamlit .etiqueta { color: var(--accent-2); }
+    footer { color: var(--text-muted); font-size: 0.8rem; }
+  </style>
 </head>
 <body>
-  <div id="pantalla-login">
-    <h1>💰 Presupuesto App</h1>
-    <p>
-      Versión web estática (sin Streamlit) — en construcción. Iniciá sesión con la misma cuenta de Google
-      que tiene acceso al Sheet de presupuesto para ver tus datos.
-    </p>
-    <button id="btn-login">Iniciar sesión con Google</button>
+  <h1>💰 Presupuesto Personal</h1>
+  <p class="caption">Dos formas de ver los mismos datos — el mismo Google Sheet, en vivo. Elegí con cuál entrar.</p>
+
+  <div class="opciones">
+    <a class="tarjeta web" href="app.html">
+      <span class="emoji">🌐</span>
+      <h2>Versión Web</h2>
+      <p>100% estática, sin backend — inicia sesión con tu cuenta de Google y lee/escribe el Sheet directo desde
+      el navegador. Rápida, y siempre la más actualizada.</p>
+      <span class="etiqueta">Abrir versión Web →</span>
+    </a>
+    <a class="tarjeta streamlit" href="https://presupuesto-app-jmr.streamlit.app" target="_blank" rel="noopener">
+      <span class="emoji">🐍</span>
+      <h2>Versión Streamlit</h2>
+      <p>La app original en Python — todavía tiene algunos formularios de escritura que la versión Web no portó
+      todavía (ver el README del repo para el detalle).</p>
+      <span class="etiqueta">Abrir versión Streamlit ↗</span>
+    </a>
   </div>
 
-  <div id="app">
-    <div id="sidebar">
-      <h2>💰 Presupuesto</h2>
-      <p class="caption">Los datos se leen en vivo de tu Google Sheet.</p>
-      <div id="nav-paginas"></div>
-      <button id="btn-logout">Cerrar sesión</button>
-    </div>
-    <div id="contenido"></div>
-  </div>
-
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-  <script src="js/config.js"></script>
-  <script src="js/util.js"></script>
-  <script src="js/auth.js"></script>
-  <script src="js/sheets-api.js"></script>
-  <script src="js/drive-api.js"></script>
-  <script src="js/ingresos-gastos.js"></script>
-  <script src="js/pages/resumen.js"></script>
-  <script src="js/pages/analisis.js"></script>
-  <script src="js/pages/estados-financieros.js"></script>
-  <script src="js/pages/presupuesto.js"></script>
-  <script src="js/pages/egresos.js"></script>
-  <script src="js/pages/deudas.js"></script>
-  <script src="js/pages/inversiones.js"></script>
-  <script src="js/pages/ingresos.js"></script>
-  <script src="js/pages/facturacion.js"></script>
-  <script src="js/pages/declaraciones.js"></script>
-  <script src="js/app.js"></script>
+  <footer>presupuesto-app-web</footer>
 </body>
 </html>
