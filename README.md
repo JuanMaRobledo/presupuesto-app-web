@@ -77,20 +77,20 @@ GitHub Pages abre esa portada.
   retorno de mercado) se muestran separadas de las posiciones de inversión
   de verdad en todos lados: Posiciones, Patrimonio unificado, y no cuentan
   para XIRR/Rentabilidad/Comparación contra benchmark. "Rentabilidad sobre
-  aportes netos" (pesos) ignora los aportes/retiros a la plataforma "Fondo
-  de Inversión (banco)" — un fondo bancario aparte, sin fila en Posiciones,
-  así que un retiro ahí (p. ej. para pagar impuestos) no corresponde a
-  ningún cambio en las acciones — y de todos modos se oculta (con un aviso
-  explicando por qué) si algún día los retiros de bolsa superan los
-  depósitos de bolsa, para no dividir por un neto negativo y mostrar un
-  porcentaje sin sentido (el caso real que motivó esto daba "-768%"). Si el
-  "Fondo de Inversión (banco)" se usa como fondo de liquidez propio (plata
-  disponible para invertir o gastar en cualquier momento, no información de
-  Streamlit), agregándolo como una posición más en 'Inversiones - Pesos'
-  (Tipo "Fondo (liquidez)") aparece en el bloque de liquidez de Posiciones
-  con su propia "Rentabilidad de Fondo de Inversión (banco)" — calculada
-  solo con los aportes/retiros de esa plataforma, sin mezclarla con la de
-  las acciones ni con el patrimonio de inversiones.
+  aportes netos" (pesos) ignora los aportes/retiros a la plataforma
+  "Fiducuenta (reserva impuestos)" (Fiducuenta *5601, un fondo de inversión
+  colectiva de Bancolombia usado como reserva de liquidez, no una posición
+  de bolsa), así que un retiro ahí (p. ej. para pagar impuestos) no
+  corresponde a ningún cambio en las acciones — y de todos modos se oculta
+  (con un aviso explicando por qué) si algún día los retiros de bolsa
+  superan los depósitos de bolsa, para no dividir por un neto negativo y
+  mostrar un porcentaje sin sentido (el caso real que motivó esto daba
+  "-768%"). Esa cuenta tiene su propia fila en Posiciones (Tipo
+  "Fiducuenta", en el bloque de liquidez) y su propia "Rentabilidad de
+  Fiducuenta (reserva impuestos)" — calculada solo con los aportes/retiros
+  de esa plataforma (reconstruidos y verificados mes a mes contra los
+  extractos oficiales de Bancolombia de nov-2024 a ago-2026), sin mezclarla
+  con la de las acciones ni con el patrimonio de inversiones.
 - 💰 Ingresos — **completo, con escritura**: sub-tabs Colillas de Pago
   (resumen histórico, tendencia por quincena, y el detalle devengos/
   descuentos tanto general como filtrado a un mes puntual, quincena por
