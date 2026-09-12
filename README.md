@@ -73,9 +73,13 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   retorno de mercado) se muestran separadas de las posiciones de inversión
   de verdad en todos lados: Posiciones, Patrimonio unificado, y no cuentan
   para XIRR/Rentabilidad/Comparación contra benchmark. "Rentabilidad sobre
-  aportes netos" se oculta (con un aviso explicando por qué) cuando los
-  retiros netos superan los depósitos netos — dividir por un neto negativo
-  daba un porcentaje sin sentido (p. ej. "-768%").
+  aportes netos" (pesos) ignora los aportes/retiros a la plataforma "Fondo
+  de Inversión (banco)" — un fondo bancario aparte, sin fila en Posiciones,
+  así que un retiro ahí (p. ej. para pagar impuestos) no corresponde a
+  ningún cambio en las acciones — y de todos modos se oculta (con un aviso
+  explicando por qué) si algún día los retiros de bolsa superan los
+  depósitos de bolsa, para no dividir por un neto negativo y mostrar un
+  porcentaje sin sentido (el caso real que motivó esto daba "-768%").
 - 💰 Ingresos — **completo, con escritura**: sub-tabs Colillas de Pago
   (resumen histórico, tendencia por quincena, y el detalle devengos/
   descuentos tanto general como filtrado a un mes puntual, quincena por

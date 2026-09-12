@@ -53,6 +53,17 @@ const PaginaInversiones = (() => {
   function esCuentaLiquidez(f) {
     return TIPOS_LIQUIDEZ.has(String(f.Tipo || "").trim()) || /Efectivo\/Margen$/i.test(String(f.TickerFondo || ""));
   }
+
+  // "Fondo de Inversión (banco)" es una plataforma aparte (puerto de
+  // PLATAFORMAS_INVERSION_PESOS + _destino_inversion(), cuenta_formatos.py /
+  // app_presupuesto.py) -- un fondo bancario sin ninguna fila en "Inversiones
+  // - Pesos" (a diferencia de Trii/Acciones y Valores, que sí tienen
+  // posiciones reales ahí). Un aporte/retiro a ese fondo no corresponde a
+  // ningún cambio en las posiciones de acciones, así que mezclarlo en
+  // "Rentabilidad sobre aportes netos" comparaba manzanas con peras -- un
+  // retiro grande de ese fondo (p. ej. para pagar impuestos) restaba de la
+  // base de las ACCIONES sin que su valor hubiera bajado un peso.
+  const PLATAFORMA_FONDO_BANCO = "Fondo de Inversión (banco)";
   function separarPosiciones(posiciones) {
     const titulos = [], liquidez = [];
     for (const f of posiciones) (esCuentaLiquidez(f) ? liquidez : titulos).push(f);
@@ -359,21 +370,30 @@ const PaginaInversiones = (() => {
 
       const metricsHtml = [];
       let avisoRentabilidad = "";
-      if (moneda === "pesos" && serieValor.length && serieAportes.length) {
-        const ultimoValor = serieValor[serieValor.length - 1].valor;
-        const ultimoAporte = serieAportes[serieAportes.length - 1].acumulado;
-        // Si los retiros netos superan los depósitos netos (p. ej. un retiro grande para
-        // pagar impuestos), "ultimoAporte" queda negativo y (valor-aporte)/aporte da un
-        // porcentaje sin sentido (signo invertido) -- se oculta en vez de mostrar un
-        // número financiero engañoso.
-        if (ultimoAporte > 0) {
-          metricsHtml.push(metric("Rentabilidad sobre aportes netos",
-            `${(((ultimoValor - ultimoAporte) / ultimoAporte) * 100).toFixed(2)}%`));
-        } else if (ultimoAporte < 0) {
-          avisoRentabilidad = `<p class="caption">No se puede calcular "Rentabilidad sobre aportes netos": los
-            retiros netos (${fmtMoneda(Math.abs(ultimoAporte))}) superan los depósitos netos hasta ahora, así
-            que la fórmula (valor − aportes) / aportes no da un porcentaje interpretable. Revisá el historial
-            de aportes/retiros arriba si no esperabas esto.</p>`;
+      if (moneda === "pesos" && serieValor.length) {
+        // Solo aportes/retiros a plataformas de bolsa de verdad (Acciones y
+        // Valores/Trii) -- "Fondo de Inversión (banco)" es un fondo aparte
+        // sin fila en Posiciones (ver PLATAFORMA_FONDO_BANCO), así que un
+        // retiro ahí (p. ej. para pagar impuestos) no corresponde a ninguna
+        // baja en el valor de las acciones y no debe restar de esta base.
+        const aportesInversion = aportesMoneda.filter((f) => f.Plataforma !== PLATAFORMA_FONDO_BANCO);
+        const serieAportesInversion = serieAcumuladaAportes(aportesInversion);
+        if (serieAportesInversion.length) {
+          const ultimoValor = serieValor[serieValor.length - 1].valor;
+          const ultimoAporte = serieAportesInversion[serieAportesInversion.length - 1].acumulado;
+          // Guarda de todos modos: si algún día los retiros de bolsa (no del
+          // fondo bancario) superan los depósitos de bolsa, la fórmula
+          // (valor-aporte)/aporte con denominador negativo invierte el signo
+          // y no da un porcentaje interpretable.
+          if (ultimoAporte > 0) {
+            metricsHtml.push(metric("Rentabilidad sobre aportes netos",
+              `${(((ultimoValor - ultimoAporte) / ultimoAporte) * 100).toFixed(2)}%`));
+          } else if (ultimoAporte < 0) {
+            avisoRentabilidad = `<p class="caption">No se puede calcular "Rentabilidad sobre aportes netos": los
+              retiros netos hacia plataformas de bolsa (${fmtMoneda(Math.abs(ultimoAporte))}) superan los
+              depósitos hasta ahora, así que la fórmula (valor − aportes) / aportes no da un porcentaje
+              interpretable. Revisá el historial de aportes/retiros arriba si no esperabas esto.</p>`;
+          }
         }
       }
       const posiciones = separarPosiciones(moneda === "pesos" ? datos.posicionesPesos : datos.posicionesDolares).titulos;
