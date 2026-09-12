@@ -45,4 +45,5 @@ const RANGOS = {
   deuda_sufi: "'Deuda - Sufi'!B6:B17",
   deuda_scotiabank: "'Deuda - Scotiabank Colpatria'!B6:B17",
   deuda_fondo_empleados: "'Deuda - Fondo de Empleados'!B6:B17",
+  categorias_gasto: "'Categorías'!A2:A25",
 };

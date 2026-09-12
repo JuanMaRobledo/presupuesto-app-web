@@ -1,11 +1,13 @@
 // Puerto de _render_egreso_tab() (app_presupuesto.py) para las 3 hojas de
 // egresos (Efectivo, Visa, Mastercard) — tabla con búsqueda/filtros +
-// tendencia por período + gasto por categoría y mes.
+// tendencia por período + gasto por categoría y mes — más "➕ Agregar un
+// gasto en efectivo manualmente" (render_egresos_efectivo) y "📊 Tendencia
+// por Tarjeta" (render_egresos_tendencia, Visa vs. Mastercard).
 //
-// TODAVÍA NO portado: gestionar extractos (agregar/eliminar resumen o
-// compra puntual — son operaciones de escritura, fuera de alcance de esta
-// primera versión de solo lectura), "ver un extracto puntual" (cupo/saldo/
-// pago de un corte), y el detalle de compras en USD de Mastercard.
+// TODAVÍA NO portado: gestionar extractos de tarjeta (agregar/eliminar el
+// resumen del corte o una compra puntual, "ver un extracto puntual" —
+// bloque de escritura más grande, fuera de alcance de esta ronda) y el
+// detalle de compras en USD de Mastercard.
 
 const PaginaEgresos = (() => {
   const EGRESO_COLS = [
@@ -18,16 +20,18 @@ const PaginaEgresos = (() => {
     { key: "mc_detalle", titulo: "Egresos - Mastercard 5922", esTarjeta: true },
   ];
   const charts = {}; // bloqueKey -> {periodo: Chart, categoria: Chart} — para destruir antes de re-renderizar
+  let chartTendencia = null;
 
   let datosCache = null;
 
   async function cargarDatos() {
     if (datosCache) return datosCache;
-    const raw = await SheetsApi.batchGet(["efectivo_detalle", "visa_detalle", "mc_detalle"]);
+    const raw = await SheetsApi.batchGet(["efectivo_detalle", "visa_detalle", "mc_detalle", "categorias_gasto"]);
     datosCache = {
       efectivo_detalle: filasAObjetos(raw.efectivo_detalle, EGRESO_COLS, ["FechaCompra"]),
       visa_detalle: filasAObjetos(raw.visa_detalle, EGRESO_COLS, ["FechaCompra"]),
       mc_detalle: filasAObjetos(raw.mc_detalle, EGRESO_COLS, ["FechaCompra"]),
+      categoriasGasto: (raw.categorias_gasto || []).map((r) => r && r[0]).filter(Boolean),
     };
     return datosCache;
   }
@@ -36,16 +40,17 @@ const PaginaEgresos = (() => {
     container.innerHTML = `
       <h1>💳 Egresos</h1>
       <p class="caption">Movimientos de Efectivo, Visa y Mastercard tal como están en el Sheet, con
-      búsqueda y filtros — solo lectura por ahora.</p>
+      búsqueda y filtros.</p>
       <div class="tabs" id="tabs-egresos"></div>
       <div id="panel-egresos">Cargando datos del Sheet…</div>
     `;
 
     const tabsDiv = container.querySelector("#tabs-egresos");
     const panel = container.querySelector("#panel-egresos");
-    let activo = BLOQUES[0].key;
+    const TODAS = [...BLOQUES, { key: "tendencia", titulo: "📊 Tendencia por Tarjeta", esTarjeta: false }];
+    let activo = TODAS[0].key;
 
-    BLOQUES.forEach((b) => {
+    TODAS.forEach((b) => {
       const btn = document.createElement("button");
       btn.textContent = b.titulo;
       btn.className = "tab-btn";
@@ -59,11 +64,15 @@ const PaginaEgresos = (() => {
     tabsDiv.children[0].classList.add("activo");
 
     async function renderBloque() {
-      const bloqueInfo = BLOQUES.find((b) => b.key === activo);
       panel.innerHTML = "Cargando datos del Sheet…";
       try {
         const datos = await cargarDatos();
-        renderTabla(panel, bloqueInfo, datos[activo]);
+        if (activo === "tendencia") {
+          renderTendenciaTarjetas(panel, datos);
+        } else {
+          const bloqueInfo = BLOQUES.find((b) => b.key === activo);
+          renderTabla(panel, bloqueInfo, datos[activo], datos.categoriasGasto, renderBloque);
+        }
       } catch (err) {
         panel.innerHTML = `<div class="error">Error cargando el Sheet: ${err.message}</div>`;
         console.error(err);
@@ -73,10 +82,147 @@ const PaginaEgresos = (() => {
     renderBloque();
   }
 
-  function renderTabla(panel, bloqueInfo, filasOriginal) {
+  // ---------------------------------------------------------------------
+  // ➕ Agregar un gasto en efectivo manualmente
+  // ---------------------------------------------------------------------
+  function renderFormGastoEfectivo(panel, categoriasGasto, recargar) {
+    const div = document.createElement("div");
+    div.innerHTML = `
+      <details>
+        <summary>➕ Agregar un gasto en efectivo manualmente</summary>
+        <form id="form_gasto_efectivo">
+          <div class="row">
+            <div><label>Fecha de compra</label><br><input type="date" id="efec_fecha" required></div>
+            <div><label>Categoría</label><br>
+              <select id="efec_categoria">${categoriasGasto.map((c) => `<option value="${c}">${c}</option>`).join("")}</select>
+            </div>
+          </div>
+          <div class="campo"><label>Comercio / Concepto</label><br><input type="text" id="efec_comercio" class="input-texto" required></div>
+          <div class="row">
+            <div><label>Valor</label><br><input type="number" id="efec_valor" min="0" step="1000" required></div>
+            <div><label class="checkbox-row" style="margin-top:1.8em;"><input type="checkbox" id="efec_reembolsable">
+              Reembolsable (es en realidad gasto de tu esposa)</label></div>
+          </div>
+          <div class="campo"><label>Notas (opcional)</label><br><input type="text" id="efec_notas" class="input-texto"></div>
+          <button type="submit" id="efec_guardar">💾 Guardar gasto</button>
+        </form>
+        <div class="aviso" id="efec_msg" hidden></div>
+      </details>
+    `;
+    panel.appendChild(div);
+    div.querySelector("#efec_fecha").valueAsDate = new Date();
+    div.querySelector("#form_gasto_efectivo").addEventListener("submit", (ev) => onGuardarGastoEfectivo(ev, div, recargar));
+  }
+
+  async function onGuardarGastoEfectivo(ev, div, recargar) {
+    ev.preventDefault();
+    const g = (id) => div.querySelector(id).value;
+    const msg = div.querySelector("#efec_msg");
+    const btn = div.querySelector("#efec_guardar");
+    const comercio = g("#efec_comercio").trim();
+    const valor = Number(g("#efec_valor")) || 0;
+    if (!comercio) { mostrarMsg(msg, "Escribí un comercio o concepto.", true); return; }
+    if (valor <= 0) { mostrarMsg(msg, "El valor tiene que ser mayor que cero.", true); return; }
+
+    btn.disabled = true;
+    btn.textContent = "Guardando…";
+    try {
+      const fecha = g("#efec_fecha"); // yyyy-mm-dd
+      const categoria = g("#efec_categoria");
+      const reembolsable = div.querySelector("#efec_reembolsable").checked;
+      const notas = g("#efec_notas").trim();
+      // Puerto de as_text() (sheets_backend.py): el apóstrofe adelante
+      // fuerza texto literal con USER_ENTERED — si no, Sheets interpreta
+      // "2026-07" como fecha y "1/1" como fracción/fecha.
+      await SheetsApi.appendRows(RANGOS.efectivo_detalle, [[
+        `'${fecha.slice(0, 7)}`, fecha, comercio, "COP", "'1/1", valor, valor, 0, categoria,
+        reembolsable ? "Sí" : "No", notas,
+      ]]);
+      mostrarMsg(msg, `Gasto de ${fmtMoneda(valor)} agregado.`, false);
+      datosCache = null;
+      await recargar();
+    } catch (err) {
+      mostrarMsg(msg, `No pude guardar: ${err.message}`, true);
+      console.error(err);
+      btn.disabled = false;
+      btn.textContent = "💾 Guardar gasto";
+    }
+  }
+
+  function mostrarMsg(el, texto, esError) {
+    el.hidden = false;
+    el.textContent = texto;
+    el.style.background = esError ? "#f8d7da" : "#d1e7dd";
+    el.style.color = esError ? "#842029" : "#0f5132";
+  }
+
+  // ---------------------------------------------------------------------
+  // 📊 Tendencia por Tarjeta (Visa vs. Mastercard)
+  // ---------------------------------------------------------------------
+  function renderTendenciaTarjetas(panel, datos) {
+    panel.innerHTML = `
+      <h4>Tendencia de Tarjetas de Crédito</h4>
+      <p class="caption">Visa y Mastercard en pesos, comparadas período a período — no incluye Efectivo (no
+      es tarjeta de crédito) ni las compras en USD de Mastercard (moneda distinta, no se puede sumar con
+      pesos).</p>
+      <div id="tend_contenido"></div>
+    `;
+    const contenido = panel.querySelector("#tend_contenido");
+
+    const TARJETAS = [["visa_detalle", "Visa 7497"], ["mc_detalle", "Mastercard 5922"]];
+    const sumaPorPeriodo = {}; // periodo -> { tarjeta -> valor }
+    const totalPorTarjeta = {};
+    const periodosSet = new Set();
+    for (const [blockKey, nombre] of TARJETAS) {
+      for (const f of datos[blockKey]) {
+        if (f.Moneda !== "COP" || esNoPresupuestar(f.Categoria)) continue;
+        const periodo = f.PeriodoExtracto;
+        if (!periodo) continue;
+        const v = toNumber(f.ValorCargado);
+        sumaPorPeriodo[periodo] = sumaPorPeriodo[periodo] || {};
+        sumaPorPeriodo[periodo][nombre] = (sumaPorPeriodo[periodo][nombre] || 0) + v;
+        totalPorTarjeta[nombre] = (totalPorTarjeta[nombre] || 0) + v;
+        periodosSet.add(periodo);
+      }
+    }
+    const periodos = [...periodosSet].sort();
+
+    if (chartTendencia) chartTendencia.destroy();
+    if (!periodos.length) {
+      contenido.innerHTML = "<p>Todavía no hay compras de tarjeta cargadas.</p>";
+      return;
+    }
+
+    contenido.innerHTML = `
+      <canvas id="chart_tendencia_tarjetas" height="110"></canvas>
+      <h5>Total por tarjeta (histórico, según lo cargado)</h5>
+      <div class="metric-row">${TARJETAS.map(([, nombre]) => metric(nombre, fmtMoneda(totalPorTarjeta[nombre] || 0))).join("")}</div>
+    `;
+    const ctx = contenido.querySelector("#chart_tendencia_tarjetas").getContext("2d");
+    chartTendencia = new Chart(ctx, {
+      type: "bar",
+      data: {
+        labels: periodos,
+        datasets: TARJETAS.map(([, nombre], i) => ({
+          label: nombre,
+          data: periodos.map((p) => sumaPorPeriodo[p]?.[nombre] || 0),
+          backgroundColor: PALETA[i % PALETA.length],
+        })),
+      },
+      options: { responsive: true, scales: { y: { ticks: { callback: (v) => fmtMoneda(v) } } } },
+    });
+  }
+
+  function metric(label, value) {
+    return `<div class="metric"><div class="metric-label">${label}</div><div class="metric-value">${value}</div></div>`;
+  }
+
+  function renderTabla(panel, bloqueInfo, filasOriginal, categoriasGasto, recargar) {
     const { key: blockKey, titulo, esTarjeta } = bloqueInfo;
+    panel.innerHTML = "";
+    if (blockKey === "efectivo_detalle") renderFormGastoEfectivo(panel, categoriasGasto, recargar);
     if (!filasOriginal.length) {
-      panel.innerHTML = `<p>Todavía no hay movimientos cargados en ${titulo}.</p>`;
+      panel.insertAdjacentHTML("beforeend", `<p>Todavía no hay movimientos cargados en ${titulo}.</p>`);
       return;
     }
 
@@ -92,7 +238,8 @@ const PaginaEgresos = (() => {
     });
 
     const idp = `eg_${blockKey}`;
-    panel.innerHTML = `
+    const tablaDiv = document.createElement("div");
+    tablaDiv.innerHTML = `
       <h4>${titulo}</h4>
       ${esTarjeta ? `<p class="caption">El filtro de Año/Mes de abajo es por la fecha real de la compra
         ('Fecha Compra'), no por 'Periodo Extracto' del corte.</p>` : ""}
@@ -113,12 +260,13 @@ const PaginaEgresos = (() => {
       <div class="tabla-scroll"><table class="tabla" id="${idp}_tabla"></table></div>
       <div id="${idp}_graficos"></div>
     `;
+    panel.appendChild(tablaDiv);
 
-    const catSel = panel.querySelector(`#${idp}_cat`);
-    const anioSel = panel.querySelector(`#${idp}_anio`);
-    const mesSel = panel.querySelector(`#${idp}_mes`);
-    const ocultarChk = panel.querySelector(`#${idp}_ocultar`);
-    const busquedaInput = panel.querySelector(`#${idp}_busqueda`);
+    const catSel = tablaDiv.querySelector(`#${idp}_cat`);
+    const anioSel = tablaDiv.querySelector(`#${idp}_anio`);
+    const mesSel = tablaDiv.querySelector(`#${idp}_mes`);
+    const ocultarChk = tablaDiv.querySelector(`#${idp}_ocultar`);
+    const busquedaInput = tablaDiv.querySelector(`#${idp}_busqueda`);
 
     const categorias = [...new Set(filas.map((f) => f.Categoria).filter(Boolean))].sort();
     catSel.add(new Option("(todas)", "(todas)"));

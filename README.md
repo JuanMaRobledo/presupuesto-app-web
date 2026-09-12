@@ -28,7 +28,12 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   filtro de categoría/año/mes, "ocultar no presupuestar", y para las
   tarjetas el toggle Consumo (mes de compra) / Efectivo real (mes de pago,
   con el corrimiento de mes al corte correspondiente). Incluye los
-  gráficos de tendencia por período y gasto por categoría y mes (Chart.js).
+  gráficos de tendencia por período y gasto por categoría y mes (Chart.js),
+  el sub-tab de solo lectura "📊 Tendencia por Tarjeta" (Visa vs. Mastercard
+  período a período) y, **con escritura**, el formulario "➕ Agregar un
+  gasto en efectivo manualmente" (usa el mismo truco de `as_text()` — un
+  apóstrofe adelante — para que Sheets no reinterprete "2026-07" como fecha
+  ni "1/1" como fracción).
 - 🏦 Deudas — **con escritura**: tarjetas de saldo total/cuota mensual, deuda
   de Mastercard en dólares aparte, torta de participación por entidad,
   tabla completa y gráfico de cuota mensual por entidad, más el formulario
@@ -79,10 +84,15 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   Sugerir metas" no está portado.
 
 ⏳ Todavía no portado (usá la versión de Streamlit mientras tanto):
-- El gráfico de "Tendencia de los últimos meses" al pie de Resumen
-- Dentro de Egresos: gestionar extractos (agregar/eliminar — son
-  escritura), "ver un extracto puntual" (cupo/saldo/pago de un corte), y
-  el detalle de compras en USD de Mastercard
+- El gráfico de "Tendencia de los últimos meses" al pie de Resumen — lee el
+  encabezado de una hoja formulada dinámicamente (`Resumen Mensual`) y
+  requiere confirmar el orden real de columnas contra el Sheet antes de
+  portarlo, para no arriesgar mostrar un número financiero mal cruzado
+- Dentro de Egresos: gestionar extractos de tarjeta (agregar/eliminar el
+  resumen del corte o una compra puntual — son escritura), "ver un
+  extracto puntual" (cupo/saldo/pago de un corte), y el detalle de compras
+  en USD de Mastercard (agregar un gasto en efectivo y la comparación
+  Visa/Mastercard ya están portados)
 - Dentro de Inversiones: patrimonio unificado, actualizar precios (Yahoo
   Finance), historial de operaciones del broker, Crecimiento y Rentabilidad
 - Dentro de Ingresos: agregar/eliminar una colilla (quincena) — es un
