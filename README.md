@@ -27,13 +27,17 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   tarjetas el toggle Consumo (mes de compra) / Efectivo real (mes de pago,
   con el corrimiento de mes al corte correspondiente). Incluye los
   gráficos de tendencia por período y gasto por categoría y mes (Chart.js).
+- 🏦 Deudas — tarjetas de saldo total/cuota mensual, deuda de Mastercard en
+  dólares aparte, torta de participación por entidad, tabla completa y
+  gráfico de cuota mensual por entidad.
 
 ⏳ Todavía no portado (usá la versión de Streamlit mientras tanto):
 - El gráfico de "Tendencia de los últimos meses" al pie de Resumen
 - Dentro de Egresos: gestionar extractos (agregar/eliminar — son
   escritura), "ver un extracto puntual" (cupo/saldo/pago de un corte), y
   el detalle de compras en USD de Mastercard
-- 📊 Análisis, 📋 Presupuesto, 🏦 Deudas (detalle), 📈 Inversiones (detalle),
+- Dentro de Deudas: el formulario "Actualizar deudas manualmente" (escritura)
+- 📊 Análisis, 📋 Presupuesto, 📈 Inversiones (detalle),
   🏢 Estados Financieros, 💰 Ingresos, 🧾 Facturación Electrónica,
   📑 Declaraciones de Renta
 - Cualquier operación de **escritura** (agregar/editar/borrar) — esta primera

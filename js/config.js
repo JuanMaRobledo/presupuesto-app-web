@@ -29,6 +29,7 @@ const RANGOS = {
   aportes_inversion_pesos: "'Inversiones - Pesos'!A79:D1000",
   aportes_inversion_dolares: "'Inversiones - Dólares'!A79:D1000",
   deudas: "'Deudas - Resumen'!A5:H10",
+  deuda_tarjeta_usd: "'Deudas - Resumen'!A12:C12",
   resumen_kpis: "'Resumen'!B5:E18",
   mc_detalle_usd: "'Egresos - Mastercard 5922'!A5698:K6697",
 };
