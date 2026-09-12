@@ -54,16 +54,16 @@ const PaginaInversiones = (() => {
     return TIPOS_LIQUIDEZ.has(String(f.Tipo || "").trim()) || /Efectivo\/Margen$/i.test(String(f.TickerFondo || ""));
   }
 
-  // "Fondo de Inversión (banco)" es una plataforma aparte (puerto de
+  // "Fiducuenta (reserva impuestos)" es Fiducuenta *5601 (puerto de
   // PLATAFORMAS_INVERSION_PESOS + _destino_inversion(), cuenta_formatos.py /
-  // app_presupuesto.py) -- un fondo bancario sin ninguna fila en "Inversiones
-  // - Pesos" (a diferencia de Trii/Acciones y Valores, que sí tienen
-  // posiciones reales ahí). Un aporte/retiro a ese fondo no corresponde a
-  // ningún cambio en las posiciones de acciones, así que mezclarlo en
-  // "Rentabilidad sobre aportes netos" comparaba manzanas con peras -- un
-  // retiro grande de ese fondo (p. ej. para pagar impuestos) restaba de la
-  // base de las ACCIONES sin que su valor hubiera bajado un peso.
-  const PLATAFORMA_FONDO_BANCO = "Fondo de Inversión (banco)";
+  // app_presupuesto.py) -- un fondo de inversión colectiva de Bancolombia
+  // usado como reserva de liquidez, no una posición de bolsa. Un aporte/
+  // retiro a ese fondo no corresponde a ningún cambio en las posiciones de
+  // acciones, así que mezclarlo en "Rentabilidad sobre aportes netos"
+  // comparaba manzanas con peras -- un retiro grande de ese fondo (p. ej.
+  // para pagar impuestos) restaba de la base de las ACCIONES sin que su
+  // valor hubiera bajado un peso.
+  const PLATAFORMA_FONDO_BANCO = "Fiducuenta (reserva impuestos)";
   function separarPosiciones(posiciones) {
     const titulos = [], liquidez = [];
     for (const f of posiciones) (esCuentaLiquidez(f) ? liquidez : titulos).push(f);
@@ -391,10 +391,10 @@ const PaginaInversiones = (() => {
       let avisoRentabilidad = "";
       if (moneda === "pesos" && serieValor.length) {
         // Solo aportes/retiros a plataformas de bolsa de verdad (Acciones y
-        // Valores/Trii) -- "Fondo de Inversión (banco)" es un fondo aparte
-        // sin fila en Posiciones (ver PLATAFORMA_FONDO_BANCO), así que un
-        // retiro ahí (p. ej. para pagar impuestos) no corresponde a ninguna
-        // baja en el valor de las acciones y no debe restar de esta base.
+        // Valores/Trii) -- "Fiducuenta (reserva impuestos)" es una cuenta de
+        // liquidez aparte (ver PLATAFORMA_FONDO_BANCO), así que un retiro ahí
+        // (p. ej. para pagar impuestos) no corresponde a ninguna baja en el
+        // valor de las acciones y no debe restar de esta base.
         const aportesInversion = aportesMoneda.filter((f) => f.Plataforma !== PLATAFORMA_FONDO_BANCO);
         const serieAportesInversion = serieAcumuladaAportes(aportesInversion);
         if (serieAportesInversion.length) {
