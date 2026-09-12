@@ -54,4 +54,10 @@ const RANGOS = {
   historial_inversion: "'Historial de Inversiones'!A2:J5000",
   clasificacion_esencial: "'Categorías Esenciales'!A5:B60",
   balance_mensual: "'Balance Mensual'!A6:Q61",
+  // Las dos siguientes las escribe (y crea, si no existen) el GitHub Action
+  // scripts/actualizar_mercado.py -- no existen en el Sheet hasta que ese
+  // Action corre por primera vez, ver el manejo de ese caso en
+  // PaginaInversiones.cargarDatos() (js/pages/inversiones.js).
+  datos_mercado: "'Datos de Mercado (Auto)'!A1:B10",
+  historial_valor_cartera: "'Historial de Valor de Cartera'!A2:E5000",
 };

@@ -1,0 +1,36 @@
+name: Actualizar datos de mercado
+
+# Corre server-side (sin la restricción de CORS del navegador) para traer
+# precios/TRM/benchmarks reales de Yahoo Finance y dejarlos escritos en el
+# Google Sheet -- ver scripts/actualizar_mercado.py. La versión web (100%
+# estática) solo lee lo que este Action ya calculó.
+#
+# Requiere el secret GOOGLE_SERVICE_ACCOUNT_JSON en este repo (Settings →
+# Secrets and variables → Actions → New repository secret): el contenido
+# completo del JSON de la cuenta de servicio de Google que ya usa la
+# versión de Streamlit (mismo Sheet, scope de solo Sheets). Sin ese secret
+# el Action falla con un mensaje claro en vez de fallar en silencio.
+on:
+  schedule:
+    # 22:00 UTC, lunes a viernes -- después del cierre de la bolsa de
+    # Colombia y de EE.UU. Ajustá el cron si querés otra frecuencia.
+    - cron: "0 22 * * 1-5"
+  workflow_dispatch: {}
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install -r scripts/requirements.txt
+
+      - name: Actualizar precios, TRM y benchmarks
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: python scripts/actualizar_mercado.py

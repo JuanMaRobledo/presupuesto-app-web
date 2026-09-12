@@ -51,12 +51,22 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
 - 📈 Inversiones — aportes/retiros en pesos y dólares (métricas + tabla),
   depósitos y retiros por plataforma, capital neto transferido en el
   tiempo, posiciones (cantidad, precio, valor de mercado, ganancia/
-  pérdida) de cada moneda, y el "Historial de posiciones y cuenta de
-  margen" importado del broker: resumen agrupado por Plataforma/Activo/
-  Moneda con Estado (abierta larga/corta o cerrada) y Estrategia (Largo/
-  Corto), resultado realizado por posición y acumulado en el tiempo (con
+  pérdida) de cada moneda, "🌎 Patrimonio total en inversiones" (pesos +
+  dólares convertidos a COP con la TRM), "📊 Crecimiento y Rentabilidad"
+  por moneda (valor de cartera vs. aportes netos en el tiempo, XIRR
+  anualizado, y "📈 Comparación contra el benchmark" — COLCAP para pesos,
+  S&P 500 para dólares), y el "Historial de posiciones y cuenta de margen"
+  importado del broker: resumen agrupado por Plataforma/Activo/Moneda con
+  Estado (abierta larga/corta o cerrada) y Estrategia (Largo/Corto),
+  resultado realizado por posición y acumulado en el tiempo (con
   gráficos), el detalle completo de compras/ventas/cortos/coberturas, y
-  Dividendos e intereses recibidos aparte.
+  Dividendos e intereses recibidos aparte. La TRM, los precios de cada
+  posición y el valor "shadow" del benchmark vienen de Yahoo Finance —
+  imposible de consultar desde el navegador por CORS — así que los calcula
+  un GitHub Action programado (ver "Actualizar precios de mercado (Yahoo
+  Finance)" más abajo) y esta página solo lee lo que ese Action ya dejó
+  escrito en el Sheet, con degradación explícita si todavía no corrió ni
+  una vez.
 - 💰 Ingresos — **completo, con escritura**: sub-tabs Colillas de Pago
   (resumen histórico, tendencia por quincena, y el detalle devengos/
   descuentos tanto general como filtrado a un mes puntual, quincena por
@@ -127,23 +137,71 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   encabezado de una hoja formulada dinámicamente (`Resumen Mensual`) y
   requiere confirmar el orden real de columnas contra el Sheet antes de
   portarlo, para no arriesgar mostrar un número financiero mal cruzado
-- Dentro de Inversiones: patrimonio unificado, actualizar precios y
-  Crecimiento y Rentabilidad (dependen de la TRM/benchmarks vía Yahoo
-  Finance — un sitio estático no puede consultarlo desde el navegador por
-  CORS; historial de operaciones del broker ya está portado, salvo
-  agregar un dividendo/editar el historial a mano)
+- Dentro de Inversiones: importar portafolios, agregar un dividendo/interés
+  manual y editar el historial de operaciones importado del broker (son
+  formularios de escritura sobre el historial, no dependen de Yahoo
+  Finance — patrimonio unificado, actualizar precios y Crecimiento y
+  Rentabilidad ya están portados, ver más abajo)
 - Dentro de Análisis: Evolución y Año vs. Año — ambas leen dinámicamente el
   encabezado de la hoja 'Resumen Mensual' (formulada, sin un layout fijo
   en código); requieren confirmar el orden real de columnas contra el
   Sheet antes de portarlas (Esenciales/No Esenciales y Balance Mensual ya
   están portados)
-- Todas las secciones de nivel superior de la app, y sus escrituras
-  puntuales, ya están portadas. Lo único que queda pendiente son las
-  cuatro piezas de arriba — todas bloqueadas por lo mismo: o dependen de
-  Yahoo Finance (CORS, sin backend que lo evite) o de leer dinámicamente
-  el encabezado de una hoja formulada sin un layout fijo en el código
-  Python (`Resumen Mensual`), y en ninguno de los dos casos vale la pena
-  adivinar con datos financieros
+- Las tres piezas de arriba están bloqueadas por lo mismo: leer
+  dinámicamente el encabezado de una hoja formulada sin un layout fijo en
+  el código Python (`Resumen Mensual`), donde no vale la pena adivinar con
+  datos financieros. Todo lo demás de la app, incluyendo lo que dependía
+  de Yahoo Finance, ya está portado.
+
+## Actualizar precios de mercado (Yahoo Finance)
+
+La TRM, los precios de cada posición y el valor "shadow" de cada benchmark
+(cuánto valdrían hoy los mismos aportes puestos en el benchmark en vez de en
+la cartera real) vienen de Yahoo Finance — un sitio 100% estático no puede
+consultarlo desde el navegador porque Yahoo no habilita ese origen para JS
+de terceros (CORS). En vez de eso, un **GitHub Action programado**
+(`.github/workflows/actualizar-mercado.yml`, corre
+`scripts/actualizar_mercado.py`) lo hace del lado del servidor — sin esa
+restricción — y deja los resultados escritos directo en el Sheet:
+
+- Columna "Precio Actual" de cada posición en `Inversiones - Pesos` /
+  `Inversiones - Dólares`.
+- Un snapshot diario del valor de cartera por moneda, en la hoja
+  `Historial de Valor de Cartera` (la crea sola si no existe).
+- La TRM y el valor shadow de cada benchmark (COLCAP para pesos, S&P 500
+  para dólares), en la hoja `Datos de Mercado (Auto)` (también se crea
+  sola).
+
+Esta página web solo **lee** esas tres hojas ya calculadas — nunca llama a
+Yahoo Finance. Si el Action todavía no corrió ni una vez, esas dos hojas
+nuevas no existen todavía: Inversiones lo detecta y muestra un aviso en vez
+de romperse (patrimonio unificado sin unificar, Crecimiento y Rentabilidad
+"todavía no hay historial").
+
+**Configuración de una sola vez** (para que el Action pueda escribir en tu
+Sheet):
+
+1. El Action usa la **misma cuenta de servicio de Google** que ya usa
+   `presupuesto-app` (la de Streamlit) — mismo Sheet, mismo scope de solo
+   Sheets. Si no la tenés a mano, es el archivo JSON que descargaste al
+   crear esa cuenta de servicio en Google Cloud Console (o `st.secrets`
+   `[gcp_service_account]` de tu `secrets.toml` de Streamlit).
+2. En este repo (`presupuesto-app-web`): **Settings → Secrets and
+   variables → Actions → New repository secret**.
+3. Nombre: `GOOGLE_SERVICE_ACCOUNT_JSON`. Valor: pegá el contenido
+   **completo** del JSON de la cuenta de servicio (todo el archivo, tal
+   cual). Create secret.
+4. Listo — el Action corre solo, de lunes a viernes a las 22:00 UTC (después
+   del cierre de la bolsa de Colombia y de EE. UU.; ajustá el `cron` en el
+   workflow si querés otra frecuencia). También podés correrlo a mano desde
+   **Actions → Actualizar datos de mercado → Run workflow** para no esperar
+   al próximo horario programado.
+
+Esa credencial **nunca** llega al navegador ni se guarda en el repo — vive
+solo como secret de GitHub, la lee el runner del Action en tiempo de
+ejecución. Es la misma separación que ya describe la sección de arriba:
+Client ID de OAuth (público, vive en el código) vs. cuenta de servicio
+(secreta, nunca en el navegador).
 
 ## Cómo probarlo en local
 
@@ -211,6 +269,10 @@ js/ingresos-gastos.js — puerto de _ingresos_gastos_periodo(), compartido entre
                          Resumen y Estados Financieros → Estado de Resultados
 js/app.js            — nav lateral y bootstrap
 js/pages/*.js        — una página por sección, cada una expone render(container)
+scripts/actualizar_mercado.py — GitHub Action: precios/TRM/benchmarks vía
+                         Yahoo Finance, corre server-side (ver "Actualizar
+                         precios de mercado" más arriba)
+.github/workflows/actualizar-mercado.yml — programación del Action de arriba
 ```
 
 Para portar una página nueva: agregar sus rangos a `RANGOS` en `config.js`,

@@ -1,15 +1,25 @@
 // Puerto (parcial, solo lectura) de render_inversiones() (app_presupuesto.py):
 // aportes/retiros en pesos y dólares (con flujo neto por plataforma y en el
 // tiempo), posiciones (cantidad, precio, valor de mercado, ganancia/pérdida),
-// y el historial de posiciones/cuenta de margen importado del broker (cierres
-// realizados, ventas en corto, dividendos e intereses).
+// patrimonio unificado (pesos + dólares convertidos con la TRM), Crecimiento
+// y Rentabilidad (valor de cartera vs. aportes netos, XIRR, comparación
+// contra benchmark) y el historial de posiciones/cuenta de margen importado
+// del broker (cierres realizados, ventas en corto, dividendos e intereses).
 //
-// TODAVÍA NO portado: patrimonio unificado, importar portafolios/actualizar
-// precios y Crecimiento y Rentabilidad — dependen de la TRM/benchmarks vía
-// Yahoo Finance, que un sitio estático no puede consultar del lado del
-// navegador (CORS — Yahoo no habilita ese origen para JS de terceros), y
-// _form_agregar_dividendo()/_form_editar_historial() (escritura sobre el
-// historial de operaciones).
+// Precios, TRM y el valor "shadow" del benchmark vienen de Yahoo Finance, que
+// un sitio estático no puede consultar del lado del navegador (CORS — Yahoo
+// no habilita ese origen para JS de terceros) -- en vez de eso los calcula un
+// GitHub Action programado (scripts/actualizar_mercado.py, en la raíz del
+// repo) con la misma cuenta de servicio que usa la versión de Streamlit
+// (guardada como secret de GitHub, nunca expuesta al navegador) y los deja
+// escritos en el Sheet: columna 'Precio Actual' de cada posición, la hoja
+// 'Historial de Valor de Cartera' (snapshot diario) y 'Datos de Mercado
+// (Auto)' (TRM + valor shadow de cada benchmark). Esta página solo lee esos
+// valores ya calculados -- ver cargarDatos() más abajo para cómo se degrada
+// si el Action todavía no corrió ni una vez (esas dos hojas no existen).
+//
+// TODAVÍA NO portado: importar portafolios, _form_agregar_dividendo() y
+// _form_editar_historial() (escritura sobre el historial de operaciones).
 
 const PaginaInversiones = (() => {
   const APORTE_COLS = ["Fecha", "Plataforma", "MontoTransferido", "Notas"];
@@ -21,20 +31,128 @@ const PaginaInversiones = (() => {
     "Fecha", "Plataforma", "Moneda", "Activo", "Operacion", "Cantidad", "Precio", "Comision", "ResultadoRealizado", "Fuente",
   ];
   const SIGNO_OPERACION = { BUY: 1, COVER: 1, SELL: -1, SHORT: -1 };
+  // Puerto de VALOR_CARTERA_HEADERS (sheets_backend.py).
+  const VALOR_CARTERA_COLS = ["Fecha", "Moneda", "ValorCosto", "ValorActual", "AportesNetos"];
   const charts = {};
+
+  // 'Datos de Mercado (Auto)' es una hoja simple de clave/valor (columna A =
+  // etiqueta, B = valor) que escribe scripts/actualizar_mercado.py -- se lee
+  // por etiqueta en vez de por posición fija de fila, para no depender de
+  // que el Action mantenga siempre el mismo orden.
+  function parseDatosMercado(filas) {
+    const map = {};
+    for (const r of filas || []) {
+      if (!r || !r[0]) continue;
+      map[String(r[0]).trim()] = r[1];
+    }
+    const num = (v) => (typeof v === "number" ? v : null);
+    return {
+      fechaActualizacion: map["Fecha de Actualización"] || null,
+      trm: num(map["TRM (USD/COP)"]),
+      trmFecha: map["TRM Fecha"] || null,
+      benchmarks: {
+        pesos: { nombre: map["Benchmark Pesos"] || null, valorShadow: num(map["Benchmark Pesos Valor Shadow (COP)"]) },
+        dolares: { nombre: map["Benchmark Dólares"] || null, valorShadow: num(map["Benchmark Dólares Valor Shadow (USD)"]) },
+      },
+    };
+  }
+
+  const MERCADO_VACIO = {
+    fechaActualizacion: null, trm: null, trmFecha: null,
+    benchmarks: { pesos: { nombre: null, valorShadow: null }, dolares: { nombre: null, valorShadow: null } },
+  };
 
   async function cargarDatos() {
     const raw = await SheetsApi.batchGet([
       "aportes_inversion_pesos", "aportes_inversion_dolares", "posiciones_pesos", "posiciones_dolares",
       "historial_inversion",
     ]);
+    // 'datos_mercado'/'historial_valor_cartera' van en un batchGet aparte:
+    // las crea recién el primer corrido exitoso del GitHub Action, así que
+    // hasta entonces el rango referencia una hoja que no existe -- la API de
+    // Sheets responde 400 para el batchGet ENTERO en ese caso, no solo para
+    // ese rango, así que aislarlo evita romper el resto de Inversiones.
+    let mercado = MERCADO_VACIO;
+    let historialValorCartera = [];
+    try {
+      const rawMercado = await SheetsApi.batchGet(["datos_mercado", "historial_valor_cartera"]);
+      mercado = parseDatosMercado(rawMercado.datos_mercado);
+      historialValorCartera = filasAObjetos(rawMercado.historial_valor_cartera, VALOR_CARTERA_COLS, ["Fecha"]);
+    } catch (err) {
+      console.warn("Todavía no hay datos de mercado del GitHub Action (¿corrió alguna vez?):", err.message);
+    }
     return {
       aportesPesos: filasAObjetos(raw.aportes_inversion_pesos, APORTE_COLS, ["Fecha"]),
       aportesDolares: filasAObjetos(raw.aportes_inversion_dolares, APORTE_COLS, ["Fecha"]),
       posicionesPesos: filasAObjetos(raw.posiciones_pesos, POSICION_COLS),
       posicionesDolares: filasAObjetos(raw.posiciones_dolares, POSICION_COLS),
       historial: filasAObjetos(raw.historial_inversion, HISTORIAL_COLS, ["Fecha"]),
+      mercado,
+      historialValorCartera,
     };
+  }
+
+  // Puerto de _xirr() (app_presupuesto.py) -- bisección, sin depender de
+  // scipy. 'flujos': [{fecha: "yyyy-mm-dd", monto}], salida negativa (aporte)
+  // y positiva (retiro o valor final). null si no converge.
+  function xirr(flujos) {
+    if (flujos.length < 2) return null;
+    const fecha0 = flujos.reduce((min, f) => (f.fecha < min ? f.fecha : min), flujos[0].fecha);
+    const dias = (fecha) => (new Date(fecha) - new Date(fecha0)) / 86400000;
+    const van = (tasa) => flujos.reduce((s, f) => s + f.monto / Math.pow(1 + tasa, dias(f.fecha) / 365), 0);
+    let lo = -0.99, hi = 10.0;
+    let vanLo = van(lo);
+    const vanHi = van(hi);
+    if (vanLo === 0) return lo;
+    if (vanLo * vanHi > 0) return null;
+    let mid = lo;
+    for (let i = 0; i < 200; i++) {
+      mid = (lo + hi) / 2;
+      const vanMid = van(mid);
+      if (Math.abs(vanMid) < 1e-6) return mid;
+      if (vanLo * vanMid < 0) hi = mid; else { lo = mid; vanLo = vanMid; }
+    }
+    return mid;
+  }
+
+  // Puerto de _rentabilidad_xirr() (app_presupuesto.py).
+  function rentabilidadXirr(aportes, valorActualNativo, moneda, trm) {
+    const flujos = [];
+    for (const f of aportes) {
+      const fechaISO = parseFechaISO(f.Fecha);
+      const monto = toNumber(f.MontoTransferido);
+      if (fechaISO && monto) flujos.push({ fecha: fechaISO, monto: -monto });
+    }
+    let valorFinal = valorActualNativo;
+    if (moneda === "dolares") {
+      if (trm === null) return null;
+      valorFinal *= trm;
+    }
+    if (valorFinal) flujos.push({ fecha: new Date().toISOString().slice(0, 10), monto: valorFinal });
+    if (flujos.length < 2 || !flujos.some((f) => f.monto < 0) || !flujos.some((f) => f.monto > 0)) return null;
+    return xirr(flujos);
+  }
+
+  function patrimonioTotal(posiciones) {
+    return posiciones.reduce((s, f) => s + toNumber(f.ValorActual), 0);
+  }
+
+  // Puerto de _serie_acumulada() (app_presupuesto.py), aplicado a aportes.
+  function serieAcumuladaAportes(aportes) {
+    const ordenados = aportes
+      .map((f) => ({ fechaISO: parseFechaISO(f.Fecha), monto: toNumber(f.MontoTransferido) }))
+      .filter((f) => f.fechaISO)
+      .sort((a, b) => a.fechaISO.localeCompare(b.fechaISO));
+    let acumulado = 0;
+    return ordenados.map((f) => { acumulado += f.monto; return { fechaISO: f.fechaISO, acumulado }; });
+  }
+
+  function serieValorCartera(historial, moneda) {
+    return historial
+      .filter((f) => f.Moneda === moneda)
+      .map((f) => ({ fechaISO: parseFechaISO(f.Fecha), valor: toNumber(f.ValorActual) }))
+      .filter((f) => f.fechaISO)
+      .sort((a, b) => a.fechaISO.localeCompare(b.fechaISO));
   }
 
   function resumenAportes(aportes) {
@@ -68,6 +186,9 @@ const PaginaInversiones = (() => {
     try {
       const datos = await cargarDatos();
       contenido.innerHTML = `
+        <div id="inv-patrimonio"></div>
+        <hr>
+
         <div class="col-2">
           <div>
             <h4>Pesos (COP)</h4>
@@ -92,24 +213,191 @@ const PaginaInversiones = (() => {
 
         <h4>Posiciones — Pesos</h4>
         ${renderPosiciones(datos.posicionesPesos, "COP")}
+        <div id="inv-crecimiento-pesos"></div>
 
         <h4>Posiciones — Dólares</h4>
         ${renderPosiciones(datos.posicionesDolares, "USD")}
+        <div id="inv-crecimiento-dolares"></div>
 
         <div id="inv-historial"></div>
 
-        <div class="aviso">⚠️ Todavía no portados: patrimonio unificado, actualizar precios (Yahoo Finance) y
-        el gráfico de Crecimiento y Rentabilidad — dependen de la TRM/benchmarks vía Yahoo Finance, que este
-        sitio no puede consultar del lado del navegador. Usá
+        <div class="aviso">⚠️ Todavía no portado: agregar un dividendo/interés manual y editar el historial de
+        operaciones importado del broker. Usá
         <a href="https://presupuesto-app-jmr.streamlit.app" target="_blank" rel="noopener">la versión de
         Streamlit</a> para eso mientras tanto.</div>
       `;
 
       renderGraficos(contenido, datos);
+      renderPatrimonioUnificado(contenido.querySelector("#inv-patrimonio"), datos);
+      renderCrecimientoRentabilidad(contenido.querySelector("#inv-crecimiento-pesos"), datos, "pesos");
+      renderCrecimientoRentabilidad(contenido.querySelector("#inv-crecimiento-dolares"), datos, "dolares");
       renderHistorialInversion(contenido.querySelector("#inv-historial"), datos);
     } catch (err) {
       contenido.innerHTML = `<div class="error">Error cargando el Sheet: ${err.message}</div>`;
       console.error(err);
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Patrimonio unificado (puerto de _render_patrimonio_unificado()) y
+  // Crecimiento y Rentabilidad (puerto de _render_crecimiento_rentabilidad())
+  // ---------------------------------------------------------------------
+  function renderPatrimonioUnificado(div, datos) {
+    const patrimonioPesos = patrimonioTotal(datos.posicionesPesos);
+    const patrimonioDolares = patrimonioTotal(datos.posicionesDolares);
+    const trm = datos.mercado.trm;
+    if (trm === null) {
+      div.innerHTML = `
+        <h4>🌎 Patrimonio total en inversiones</h4>
+        <p class="caption">No pude leer la TRM (USD/COP) del último dato de mercado del GitHub Action — mostrando
+        cada moneda por separado, sin unificar.</p>
+        <div class="metric-row">
+          ${metric("Pesos (COP)", fmtMoneda(patrimonioPesos))}
+          ${metric("Dólares (USD)", "US$ " + patrimonioDolares.toLocaleString("en-US", { minimumFractionDigits: 2 }))}
+        </div>
+      `;
+      return;
+    }
+    const patrimonioDolaresCop = patrimonioDolares * trm;
+    const total = patrimonioPesos + patrimonioDolaresCop;
+    div.innerHTML = `
+      <h4>🌎 Patrimonio total en inversiones</h4>
+      <div class="metric-row">
+        ${metric("Pesos (COP)", fmtMoneda(patrimonioPesos))}
+        ${metric(`Dólares → COP (TRM $${trm.toLocaleString("en-US", { maximumFractionDigits: 0 })})`, fmtMoneda(patrimonioDolaresCop))}
+        ${metric("Total en inversiones (COP)", fmtMoneda(total))}
+      </div>
+      ${total > 0 ? `<canvas id="chart_patrimonio_pie" height="220"></canvas>` : ""}
+      <p class="caption">TRM $${trm.toLocaleString("en-US", { maximumFractionDigits: 2 })} COP/USD
+      (${datos.mercado.trmFecha || "sin fecha"}) — la actualiza un GitHub Action programado (no en vivo desde el
+      navegador: Yahoo Finance bloquea ese acceso por CORS a un sitio estático).</p>
+    `;
+    if (total > 0) {
+      charts.patrimonioPie?.destroy();
+      charts.patrimonioPie = new Chart(div.querySelector("#chart_patrimonio_pie").getContext("2d"), {
+        type: "pie",
+        data: {
+          labels: ["Pesos", "Dólares (convertido)"],
+          datasets: [{ data: [patrimonioPesos, patrimonioDolaresCop], backgroundColor: ["#1d4ed8", "#0d9488"] }],
+        },
+        options: { responsive: true, plugins: { title: { display: true, text: "Distribución por moneda (en COP)" } } },
+      });
+    }
+  }
+
+  function renderCrecimientoRentabilidad(div, datos, moneda) {
+    const unidad = moneda === "pesos" ? "COP" : "USD";
+    const serieValor = serieValorCartera(datos.historialValorCartera, moneda);
+    const aportesMoneda = moneda === "pesos" ? datos.aportesPesos : datos.aportesDolares;
+    const serieAportes = serieAcumuladaAportes(aportesMoneda);
+
+    let html = `<h5>📊 Crecimiento y Rentabilidad</h5>`;
+    if (!serieValor.length && !serieAportes.length) {
+      html += `<p class="caption">Todavía no hay historial para graficar — a medida que el GitHub Action
+        actualice precios o cargues aportes, esta sección va a ir acumulando la serie en el tiempo.</p>`;
+      div.innerHTML = html;
+    } else {
+      if (serieValor.length < 2) {
+        html += `<p class="caption">El valor de cartera se guarda como una foto cada vez que corre el GitHub
+          Action de precios — llevás ${serieValor.length} foto(s) para ${unidad}. El gráfico se va a ir
+          llenando solo.</p>`;
+      }
+      html += `
+        <canvas id="chart_crecimiento_${moneda}" height="160"></canvas>
+        <div id="crecimiento_metrics_${moneda}" class="metric-row"></div>
+      `;
+      div.innerHTML = html;
+      renderChartCrecimiento(div.querySelector(`#chart_crecimiento_${moneda}`), serieValor, serieAportes, moneda, unidad);
+
+      const metricsHtml = [];
+      if (moneda === "pesos" && serieValor.length && serieAportes.length) {
+        const ultimoValor = serieValor[serieValor.length - 1].valor;
+        const ultimoAporte = serieAportes[serieAportes.length - 1].acumulado;
+        if (ultimoAporte) {
+          metricsHtml.push(metric("Rentabilidad sobre aportes netos",
+            `${(((ultimoValor - ultimoAporte) / ultimoAporte) * 100).toFixed(2)}%`));
+        }
+      }
+      const posiciones = moneda === "pesos" ? datos.posicionesPesos : datos.posicionesDolares;
+      const xirrValor = rentabilidadXirr(aportesMoneda, patrimonioTotal(posiciones), moneda, datos.mercado.trm);
+      if (xirrValor !== null) {
+        metricsHtml.push(metric(
+          moneda === "pesos" ? "Rentabilidad anualizada (XIRR)" : "Rentabilidad anualizada (XIRR, con TRM de hoy)",
+          `${(xirrValor * 100).toFixed(2)}%`));
+      }
+      div.querySelector(`#crecimiento_metrics_${moneda}`).innerHTML = metricsHtml.join("");
+    }
+
+    const bench = datos.mercado.benchmarks[moneda];
+    if (bench && bench.nombre) {
+      const valorReal = patrimonioTotal(moneda === "pesos" ? datos.posicionesPesos : datos.posicionesDolares);
+      const fmtBench = (v) => (moneda === "dolares" ? "US$ " + v.toLocaleString("en-US", { minimumFractionDigits: 2 }) : fmtMoneda(v));
+      if (bench.valorShadow !== null) {
+        const diferencia = valorReal - bench.valorShadow;
+        div.insertAdjacentHTML("beforeend", `
+          <h6>📈 Comparación contra ${bench.nombre}</h6>
+          <p class="caption">Si cada aporte/retiro real (misma fecha, mismo monto) se hubiera puesto en
+          ${bench.nombre} en vez de en tu cartera, hoy valdría lo de abajo — calculado por el GitHub Action con
+          datos de Yahoo Finance (para dólares, convirtiendo cada aporte con la TRM histórica del día que lo
+          hiciste, no la de hoy).</p>
+          <div class="metric-row">
+            ${metric(`Tu cartera hoy (${unidad})`, fmtBench(valorReal))}
+            ${metric(`${bench.nombre} con los mismos aportes (${unidad})`, fmtBench(bench.valorShadow))}
+            ${metric("Diferencia", (diferencia >= 0 ? "+" : "") + fmtBench(diferencia))}
+          </div>
+        `);
+      } else {
+        div.insertAdjacentHTML("beforeend", `<p class="caption">No pude descargar el histórico de
+          ${bench.nombre} para comparar — puede ser un corte temporal de Yahoo Finance, o que el símbolo no sea
+          el correcto.</p>`);
+      }
+    }
+  }
+
+  function renderChartCrecimiento(canvas, serieValor, serieAportes, moneda, unidad) {
+    charts[`crecimiento_${moneda}`]?.destroy();
+    if (moneda === "pesos") {
+      const datasets = [];
+      if (serieValor.length) datasets.push({
+        label: "Valor de Cartera", data: serieValor.map((f) => ({ x: f.fechaISO, y: f.valor })),
+        borderColor: "#4573d6", backgroundColor: "#4573d6", tension: 0.1,
+      });
+      if (serieAportes.length) datasets.push({
+        label: "Aportes Netos Acumulados", data: serieAportes.map((f) => ({ x: f.fechaISO, y: f.acumulado })),
+        borderColor: "#45a06a", backgroundColor: "#45a06a", tension: 0.1,
+      });
+      charts[`crecimiento_${moneda}`] = new Chart(canvas.getContext("2d"), {
+        type: "line",
+        data: { datasets },
+        options: {
+          responsive: true, parsing: false,
+          plugins: { title: { display: true, text: `Crecimiento de la cartera (${unidad})` } },
+          scales: { x: { type: "category" }, y: { ticks: { callback: (v) => fmtMoneda(v) } } },
+        },
+      });
+    } else {
+      const datasets = [];
+      if (serieValor.length) datasets.push({
+        label: "Valor de Cartera (USD)", data: serieValor.map((f) => ({ x: f.fechaISO, y: f.valor })),
+        borderColor: "#4573d6", backgroundColor: "#4573d6", tension: 0.1, yAxisID: "y",
+      });
+      if (serieAportes.length) datasets.push({
+        label: "Aportes Netos Acumulados (COP)", data: serieAportes.map((f) => ({ x: f.fechaISO, y: f.acumulado })),
+        borderColor: "#45a06a", backgroundColor: "#45a06a", tension: 0.1, yAxisID: "y1",
+      });
+      charts[`crecimiento_${moneda}`] = new Chart(canvas.getContext("2d"), {
+        type: "line",
+        data: { datasets },
+        options: {
+          responsive: true, parsing: false,
+          plugins: { title: { display: true, text: "Crecimiento de la cartera (USD) vs. aportes transferidos (COP)" } },
+          scales: {
+            x: { type: "category" },
+            y: { type: "linear", position: "left", title: { display: true, text: "USD" } },
+            y1: { type: "linear", position: "right", title: { display: true, text: "COP (aportes transferidos)" }, grid: { drawOnChartArea: false } },
+          },
+        },
+      });
     }
   }
 
