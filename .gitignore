@@ -1,0 +1,17 @@
+# Tu Excel real y cualquier copia de seguridad — nunca se suben al repo
+*.xlsx
+*.xls
+!plantilla*.xlsx
+*.backup-*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Sistema
+.DS_Store
