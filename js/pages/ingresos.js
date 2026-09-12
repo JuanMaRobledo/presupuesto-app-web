@@ -192,7 +192,7 @@ const PaginaIngresos = (() => {
             </div>
           </div>
           <div class="campo"><label>Concepto</label><br><input type="text" id="ing_concepto" class="input-texto" required></div>
-          <div class="campo"><label>Valor</label><br><input type="number" id="ing_valor" min="0" step="1000" required></div>
+          <div class="campo"><label>Valor</label><br><input type="number" id="ing_valor" min="0" step="any" required></div>
           <div class="campo"><label>Notas (opcional)</label><br><input type="text" id="ing_notas" class="input-texto"></div>
           <button type="submit" id="ing_guardar">💾 Guardar ingreso</button>
         </form>

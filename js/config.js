@@ -46,4 +46,6 @@ const RANGOS = {
   deuda_scotiabank: "'Deuda - Scotiabank Colpatria'!B6:B17",
   deuda_fondo_empleados: "'Deuda - Fondo de Empleados'!B6:B17",
   categorias_gasto: "'Categorías'!A2:A25",
+  visa_resumen: "'Egresos - Tarjeta Visa 7497'!A5621:K5660",
+  mc_resumen: "'Egresos - Mastercard 5922'!A5608:K5647",
 };

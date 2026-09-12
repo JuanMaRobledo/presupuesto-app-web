@@ -114,7 +114,7 @@ const PaginaFacturacion = (() => {
       <form id="form_factura">
         <div class="row">
           <div><label>Fecha</label><br><input type="date" id="fac_fecha" required></div>
-          <div><label>Valor (dejalo en 0 si no lo sabés)</label><br><input type="number" id="fac_valor" min="0" step="1000" value="0"></div>
+          <div><label>Valor (dejalo en 0 si no lo sabés)</label><br><input type="number" id="fac_valor" min="0" step="any" value="0"></div>
         </div>
         <div class="campo"><label>Emisor (razón social)</label><br><input type="text" id="fac_emisor" class="input-texto" required></div>
         <div class="row">

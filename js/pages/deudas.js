@@ -197,17 +197,17 @@ const PaginaDeudas = (() => {
           <h5>Lo esencial — esto es lo que hace que aparezca en la tabla de arriba</h5>
           <div class="row">
             <div><label>Saldo Actual</label><br>
-              <input type="number" id="deuda_saldo_${key}" min="0" step="10000" value="${toNumber(datos.saldo_actual)}"></div>
+              <input type="number" id="deuda_saldo_${key}" min="0" step="any" value="${toNumber(datos.saldo_actual)}"></div>
             <div><label>Tasa E.A. (%)</label><br>
-              <input type="number" id="deuda_tasa_${key}" min="0" step="0.1" value="${(toNumber(datos.tasa_ea) * 100).toFixed(2)}"></div>
+              <input type="number" id="deuda_tasa_${key}" min="0" step="any" value="${(toNumber(datos.tasa_ea) * 100).toFixed(2)}"></div>
             <div><label>Cuota Mensual</label><br>
-              <input type="number" id="deuda_cuota_${key}" min="0" step="10000" value="${toNumber(datos.cuota_mensual)}"></div>
+              <input type="number" id="deuda_cuota_${key}" min="0" step="any" value="${toNumber(datos.cuota_mensual)}"></div>
           </div>
           <details>
             <summary>Datos adicionales (opcional, para el pronóstico de pagos completo)</summary>
             <div class="row">
-              <div><label>Plazo (meses)</label><br><input type="number" id="deuda_plazo_${key}" step="1" value="${toNumber(datos.plazo_meses)}"></div>
-              <div><label>N° Cuota Actual</label><br><input type="number" id="deuda_ncuota_${key}" step="1" value="${toNumber(datos.numero_cuota_actual)}"></div>
+              <div><label>Plazo (meses)</label><br><input type="number" id="deuda_plazo_${key}" step="any" value="${toNumber(datos.plazo_meses)}"></div>
+              <div><label>N° Cuota Actual</label><br><input type="number" id="deuda_ncuota_${key}" step="any" value="${toNumber(datos.numero_cuota_actual)}"></div>
               <div><label>N° Obligación</label><br><input type="text" id="deuda_nobl_${key}" class="input-texto" value="${datos.numero_obligacion ?? ""}"></div>
             </div>
             <div class="row">
@@ -215,7 +215,7 @@ const PaginaDeudas = (() => {
               <div><label>Próxima Fecha de Pago</label><br><input type="date" id="deuda_fprox_${key}" value="${datos.proxima_fecha_pago || ""}"></div>
               <div><label>Fecha Desembolso</label><br><input type="date" id="deuda_fdes_${key}" value="${datos.fecha_desembolso || ""}"></div>
             </div>
-            <div class="campo"><label>Monto Inicial</label><br><input type="number" id="deuda_minicial_${key}" min="0" step="10000" value="${toNumber(datos.monto_inicial)}"></div>
+            <div class="campo"><label>Monto Inicial</label><br><input type="number" id="deuda_minicial_${key}" min="0" step="any" value="${toNumber(datos.monto_inicial)}"></div>
             <div class="campo"><label>Nota</label><br><input type="text" id="deuda_nota_${key}" class="input-texto" value="${datos.nota ?? ""}"></div>
           </details>
           <button type="submit" id="deuda_guardar_${key}">💾 Guardar</button>

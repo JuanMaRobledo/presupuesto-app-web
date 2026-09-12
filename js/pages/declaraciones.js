@@ -62,16 +62,16 @@ const PaginaDeclaraciones = (() => {
             <div><label>Fecha de Presentación</label><br><input type="date" id="dr_fecha" required></div>
           </div>
           <div class="row">
-            <div><label>Patrimonio Líquido</label><br><input type="number" id="dr_patrimonio" min="0" step="1000"></div>
-            <div><label>Ingresos Brutos</label><br><input type="number" id="dr_ingresos" min="0" step="1000"></div>
+            <div><label>Patrimonio Líquido</label><br><input type="number" id="dr_patrimonio" min="0" step="any"></div>
+            <div><label>Ingresos Brutos</label><br><input type="number" id="dr_ingresos" min="0" step="any"></div>
           </div>
           <div class="row">
-            <div><label>Renta Líquida Gravable</label><br><input type="number" id="dr_renta" min="0" step="1000"></div>
-            <div><label>Impuesto a Cargo</label><br><input type="number" id="dr_impuesto" min="0" step="1000"></div>
+            <div><label>Renta Líquida Gravable</label><br><input type="number" id="dr_renta" min="0" step="any"></div>
+            <div><label>Impuesto a Cargo</label><br><input type="number" id="dr_impuesto" min="0" step="any"></div>
           </div>
           <div class="row">
-            <div><label>Retenciones y Anticipos</label><br><input type="number" id="dr_retenciones" min="0" step="1000"></div>
-            <div><label>Saldo (+ a pagar / - a favor)</label><br><input type="number" id="dr_saldo" step="1000"></div>
+            <div><label>Retenciones y Anticipos</label><br><input type="number" id="dr_retenciones" min="0" step="any"></div>
+            <div><label>Saldo (+ a pagar / - a favor)</label><br><input type="number" id="dr_saldo" step="any"></div>
           </div>
           <div class="campo">
             <label>PDF de la declaración (opcional) — se sube directo a tu Google Drive</label><br>

@@ -93,5 +93,22 @@ const SheetsApi = (() => {
     return res.json();
   }
 
-  return { batchGet, updateRange, batchUpdateRanges, appendRows, clearRange };
+  // Vacía varios rangos sueltos de una sola llamada (p. ej. todas las filas
+  // que matchean un período al borrar un extracto de tarjeta completo) —
+  // equivalente a ws.batch_clear() de gspread con varios rangos a la vez.
+  async function batchClearRanges(ranges) {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}/values:batchClear`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ ranges }),
+    });
+    if (!res.ok) {
+      const texto = await res.text();
+      throw new Error(`Error ${res.status} borrando en el Sheet: ${texto}`);
+    }
+    return res.json();
+  }
+
+  return { batchGet, updateRange, batchUpdateRanges, appendRows, clearRange, batchClearRanges };
 })();
