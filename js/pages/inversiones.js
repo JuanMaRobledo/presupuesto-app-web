@@ -567,13 +567,30 @@ const PaginaInversiones = (() => {
       if (aportes) {
         const posicionFondo = liquidez.find((f) => (f.TickerFondo || "").trim() === PLATAFORMA_FONDO_BANCO);
         if (posicionFondo) {
-          const aportesFondo = serieAcumuladaAportes(aportes.filter((f) => f.Plataforma === PLATAFORMA_FONDO_BANCO));
+          const aportesFondoRaw = aportes.filter((f) => f.Plataforma === PLATAFORMA_FONDO_BANCO);
+          const aportesFondo = serieAcumuladaAportes(aportesFondoRaw);
           if (aportesFondo.length) {
+            const valorActualFondo = toNumber(posicionFondo.ValorActual);
             const aportesNetosFondo = aportesFondo[aportesFondo.length - 1].acumulado;
+            const metricsFondo = [];
+            // La rentabilidad simple (valor-aportes)/aportes se cae cuando los
+            // retiros acumulados superan los aportes (denominador negativo,
+            // ver rentabilidadSimple) -- típico en un fondo que se usa como
+            // reserva y se vacía periódicamente (p. ej. para pagar impuestos
+            // una vez al año). El XIRR no tiene ese problema: es la misma
+            // tasa money-weighted que ya se usa para las acciones, y sigue
+            // siendo válida aunque el neto de aportes/retiros sea negativo,
+            // porque pondera cada flujo por su fecha en vez de dividir por
+            // el acumulado final.
             const { metricHtml, avisoHtml } = rentabilidadSimple(
-              `Rentabilidad de ${PLATAFORMA_FONDO_BANCO}`, toNumber(posicionFondo.ValorActual), aportesNetosFondo);
-            if (metricHtml) html += `<div class="metric-row">${metricHtml}</div>`;
-            if (avisoHtml) html += avisoHtml;
+              `Rentabilidad de ${PLATAFORMA_FONDO_BANCO}`, valorActualFondo, aportesNetosFondo);
+            if (metricHtml) metricsFondo.push(metricHtml);
+            const xirrFondo = rentabilidadXirr(aportesFondoRaw, valorActualFondo, "pesos", null);
+            if (xirrFondo !== null) {
+              metricsFondo.push(metric(`Rentabilidad anualizada de ${PLATAFORMA_FONDO_BANCO} (XIRR)`, `${(xirrFondo * 100).toFixed(2)}%`));
+            }
+            if (metricsFondo.length) html += `<div class="metric-row">${metricsFondo.join("")}</div>`;
+            if (!metricHtml && avisoHtml) html += avisoHtml;
           }
         }
       }
