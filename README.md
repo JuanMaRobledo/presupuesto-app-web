@@ -50,8 +50,13 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   comportamiento que `_form_actualizar_deuda()`.
 - 📈 Inversiones — aportes/retiros en pesos y dólares (métricas + tabla),
   depósitos y retiros por plataforma, capital neto transferido en el
-  tiempo, y posiciones (cantidad, precio, valor de mercado,
-  ganancia/pérdida) de cada moneda.
+  tiempo, posiciones (cantidad, precio, valor de mercado, ganancia/
+  pérdida) de cada moneda, y el "Historial de posiciones y cuenta de
+  margen" importado del broker: resumen agrupado por Plataforma/Activo/
+  Moneda con Estado (abierta larga/corta o cerrada) y Estrategia (Largo/
+  Corto), resultado realizado por posición y acumulado en el tiempo (con
+  gráficos), el detalle completo de compras/ventas/cortos/coberturas, y
+  Dividendos e intereses recibidos aparte.
 - 💰 Ingresos — **completo, con escritura**: sub-tabs Colillas de Pago
   (resumen histórico, tendencia por quincena, y el detalle devengos/
   descuentos tanto general como filtrado a un mes puntual, quincena por
@@ -97,8 +102,11 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   encabezado de una hoja formulada dinámicamente (`Resumen Mensual`) y
   requiere confirmar el orden real de columnas contra el Sheet antes de
   portarlo, para no arriesgar mostrar un número financiero mal cruzado
-- Dentro de Inversiones: patrimonio unificado, actualizar precios (Yahoo
-  Finance), historial de operaciones del broker, Crecimiento y Rentabilidad
+- Dentro de Inversiones: patrimonio unificado, actualizar precios y
+  Crecimiento y Rentabilidad (dependen de la TRM/benchmarks vía Yahoo
+  Finance — un sitio estático no puede consultarlo desde el navegador por
+  CORS; historial de operaciones del broker ya está portado, salvo
+  agregar un dividendo/editar el historial a mano)
 - Dentro de Análisis: Esenciales/No Esenciales, Evolución, Año vs. Año y
   Balance Mensual (esta última también necesita escritura)
 - Dentro de Estados Financieros: Flujo de Efectivo y Auditoría Anual

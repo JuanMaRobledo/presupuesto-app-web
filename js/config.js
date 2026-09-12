@@ -48,4 +48,8 @@ const RANGOS = {
   categorias_gasto: "'Categorías'!A2:A25",
   visa_resumen: "'Egresos - Tarjeta Visa 7497'!A5621:K5660",
   mc_resumen: "'Egresos - Mastercard 5922'!A5608:K5647",
+  // read_historial_inversion() (Python) lee A2:J hasta el final real de la
+  // hoja (sin un límite fijo en BLOCKS) — acá se usa un tope generoso, igual
+  // que el resto de los rangos de esta app.
+  historial_inversion: "'Historial de Inversiones'!A2:J5000",
 };
