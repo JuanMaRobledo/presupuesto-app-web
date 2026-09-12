@@ -1,14 +1,18 @@
-// Puerto compartido de _ingresos_gastos_periodo() (app_presupuesto.py) —
-// usado por 🏠 Resumen y por 🏢 Estados Financieros → Estado de Resultados,
-// para no duplicar la parte más intrincada de toda la app (categorización
-// de gasto real + el cruce de cada movimiento "Inversiones" contra la
-// plataforma real, con neteo de retiros).
+// Puerto compartido de _ingresos_gastos_periodo() + _flujo_efectivo_periodo()
+// + _saldo_inicial_encadenado() (app_presupuesto.py) — usado por 🏠 Resumen
+// y por 🏢 Estados Financieros → Estado de Resultados/Flujo de Efectivo/
+// Auditoría Anual, para no duplicar la parte más intrincada de toda la app
+// (categorización de gasto real + el cruce de cada movimiento "Inversiones"
+// contra la plataforma real, con neteo de retiros; y la deduplicación por
+// Notas de los movimientos "(no presupuestar)" que sí mueven plata real de
+// la cuenta pero ya están contados en otro lado).
 const IngresosGastosPeriodo = (() => {
   async function cargarDatosBase() {
     const raw = await SheetsApi.batchGet([
       "colillas_resumen", "colillas_devengos", "colillas_descuentos", "otros_ingresos",
       "efectivo_detalle", "visa_detalle", "mc_detalle",
       "aportes_inversion_pesos", "aportes_inversion_dolares", "deudas", "resumen_kpis",
+      "conciliacion_efectivo",
     ]);
 
     const egresoCols = [
@@ -35,6 +39,7 @@ const IngresosGastosPeriodo = (() => {
       deudas: filasAObjetos(raw.deudas, [
         "Entidad", "TipoCredito", "SaldoActual", "TasaEA", "CuotaMensual", "PctPagado", "MesesRestantes", "FechaEstPago",
       ], ["FechaEstPago"]),
+      conciliacion: filasAObjetos(raw.conciliacion_efectivo, ["Mes", "SaldoInicial", "SaldoFinal", "FechaRegistro"], ["FechaRegistro"]),
       kpis,
     };
   }
@@ -204,5 +209,79 @@ const IngresosGastosPeriodo = (() => {
     `;
   }
 
-  return { cargarDatosBase, calcular, renderDesgloseInversiones };
+  // Puerto de _flujo_efectivo_periodo() (app_presupuesto.py) — Financiación
+  // (pago de deuda) y Conciliación (el resto de movimientos "(no
+  // presupuestar)" de la cuenta: pago automático de tarjeta, intereses/
+  // 4x1000, transferencias entre cuentas propias) para el período que
+  // define coincide(anio, mes). Se detectan por Notas, no por categoría/
+  // concepto a mano, los movimientos que YA están contados en otro lado
+  // (para no duplicar): "ya contabilizad..." en Egresos - Efectivo (el pago
+  // automático de tarjeta ya está en gasto_operativo vía el detalle
+  // devengado de cada compra) y "no duplicar"/"ya contabilizad..." en Otros
+  // Ingresos (la nómina del hospital ya está en ingresosColillas).
+  function calcularFlujoEfectivo(datos, coincide) {
+    let pagoDeuda = 0;
+    let otrosConciliacionEgreso = 0;
+    for (const fila of datos.efectivoDetalle) {
+      const [anio, mes] = extraerAnioMes(fila.FechaCompra);
+      if (!coincide(anio, mes)) continue;
+      const valor = toNumber(fila.ValorCargado);
+      if (fila.Categoria === "Pago de deuda (no presupuestar)") {
+        pagoDeuda += valor;
+      } else if (esNoPresupuestar(fila.Categoria) && !String(fila.Notas || "").toLowerCase().includes("ya contabilizad")) {
+        otrosConciliacionEgreso += valor;
+      }
+    }
+
+    let otrosConciliacionIngreso = 0;
+    for (const fila of datos.otrosIngresos) {
+      const [anio, mes] = extraerAnioMes(fila.Fecha);
+      if (!coincide(anio, mes)) continue;
+      const notasLower = String(fila.Notas || "").toLowerCase();
+      const esDuplicado = notasLower.includes("no duplicar") || notasLower.includes("ya contabilizad");
+      if (esNoPresupuestar(fila.Categoria) && !esDuplicado) {
+        otrosConciliacionIngreso += toNumber(fila.Valor);
+      }
+    }
+
+    return {
+      pagoDeuda, otrosConciliacionIngreso, otrosConciliacionEgreso,
+      flujoConciliacion: otrosConciliacionIngreso - otrosConciliacionEgreso,
+    };
+  }
+
+  // Puerto de _saldo_inicial_encadenado() (app_presupuesto.py) — saldo
+  // inicial de (anioObj, mesObj) partiendo del saldo real guardado más
+  // reciente ANTES de ese mes (no necesariamente el inmediato anterior) y
+  // sumando el flujo calculado (Operación+Inversión+Financiación+
+  // Conciliación) de cada mes intermedio. null si no hay ningún saldo
+  // guardado antes de ese mes.
+  function saldoInicialEncadenado(datos, anioObj, mesObj) {
+    const mesObjetivo = `${anioObj}-${String(mesObj).padStart(2, "0")}`;
+    const conciliacion = datos.conciliacion || [];
+    if (!conciliacion.length) return { saldo: null, mesAncla: null };
+    const anteriores = conciliacion.filter((f) => f.Mes < mesObjetivo);
+    if (!anteriores.length) return { saldo: null, mesAncla: null };
+    const filaAncla = [...anteriores].sort((a, b) => a.Mes.localeCompare(b.Mes)).pop();
+    const mesAncla = filaAncla.Mes;
+    const [anioA, mesA] = mesAncla.split("-").map(Number);
+    const idxAncla = anioA * 12 + (mesA - 1);
+    const idxObjetivo = anioObj * 12 + (mesObj - 1);
+    let saldo = toNumber(filaAncla.SaldoFinal);
+    for (let idx = idxAncla + 1; idx < idxObjetivo; idx++) {
+      const a = Math.floor(idx / 12);
+      const m = (idx % 12) + 1;
+      const coincide = (anio, mes) => anio === a && mes === m;
+      const d = calcular(datos, coincide);
+      const f = calcularFlujoEfectivo(datos, coincide);
+      const fo = d.totalIngresos - d.gasto_operativo - d.descuentosNomina;
+      const fi = -d.gasto_inversiones;
+      const ff = -f.pagoDeuda;
+      const fc = f.flujoConciliacion;
+      saldo += fo + fi + ff + fc;
+    }
+    return { saldo, mesAncla };
+  }
+
+  return { cargarDatosBase, calcular, renderDesgloseInversiones, calcularFlujoEfectivo, saldoInicialEncadenado };
 })();

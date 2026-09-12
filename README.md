@@ -94,11 +94,22 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   fórmulas de la hoja, con el toggle Efectivo real (mes en que se paga) /
   Consumo (mes en que se compra, recalculado del lado del cliente por
   `Fecha Compra`).
-- 🏢 Estados Financieros — sub-tabs **Estado de Resultados** (Ingresos −
-  Gastos operativos = Utilidad Neta, con desglose por categoría de ambos
-  lados, mismo selector Total histórico/Un año/Un mes que Resumen — ahora
-  comparten la lógica de cálculo vía `js/ingresos-gastos.js`) y **Balance
-  General** (Activos − Pasivos = Patrimonio Neto, foto de hoy).
+- 🏢 Estados Financieros — **completo, con escritura**: sub-tabs Estado de
+  Resultados (Ingresos − Gastos operativos = Utilidad Neta, con desglose
+  por categoría de ambos lados, mismo selector Total histórico/Un año/Un
+  mes que Resumen), Balance General (Activos − Pasivos = Patrimonio Neto,
+  foto de hoy), Flujo de Efectivo (Saldo Inicial + Operación + Inversión +
+  Financiación + Conciliación = Saldo Final Calculado de un mes puntual,
+  con "💾 Guardar saldos de este mes" — mismo protocolo upsert-por-clave
+  que `guardar_conciliacion_efectivo()` — y "🔎 Ver desglose del mes"
+  línea por línea) y Auditoría Anual (lo mismo acumulado para un año
+  completo, comparado contra el saldo real de diciembre, con "Ver detalle
+  mes a mes"). Las cuatro comparten la lógica de cálculo vía
+  `js/ingresos-gastos.js`, incluyendo la deduplicación por Notas de
+  Financiación/Conciliación (`ya contabilizad...`/`no duplicar` — evita
+  contar dos veces el pago automático de tarjeta o la nómina, que ya
+  están en Operación por otro camino) y el encadenado de saldo inicial
+  desde el último saldo real guardado cuando falta el del mes anterior.
 - 📋 Presupuesto — **completo, con escritura**: metas mensuales por
   categoría de gasto y por descuento de nómina, comparadas contra el
   gasto real (que calculan las fórmulas de la propia hoja 'Presupuesto' —
@@ -126,13 +137,13 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   en código); requieren confirmar el orden real de columnas contra el
   Sheet antes de portarlas (Esenciales/No Esenciales y Balance Mensual ya
   están portados)
-- Dentro de Estados Financieros: Flujo de Efectivo y Auditoría Anual
-  (necesitan la lógica de deduplicación por Notas que separa
-  Financiación/Conciliación del resto de movimientos "no presupuestar")
-- Todas las secciones de nivel superior de la app ya están portadas — lo
-  que queda son sub-secciones puntuales (arriba) y operaciones de
-  escritura sueltas (agregar/editar/borrar una fila puntual) en las
-  secciones que hoy son de solo lectura
+- Todas las secciones de nivel superior de la app, y sus escrituras
+  puntuales, ya están portadas. Lo único que queda pendiente son las
+  cuatro piezas de arriba — todas bloqueadas por lo mismo: o dependen de
+  Yahoo Finance (CORS, sin backend que lo evite) o de leer dinámicamente
+  el encabezado de una hoja formulada sin un layout fijo en el código
+  Python (`Resumen Mensual`), y en ninguno de los dos casos vale la pena
+  adivinar con datos financieros
 
 ## Cómo probarlo en local
 

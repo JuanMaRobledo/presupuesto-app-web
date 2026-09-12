@@ -1,9 +1,6 @@
-// Puerto (parcial, solo lectura) de render_estados_financieros()
-// (app_presupuesto.py): Estado de Resultados y Balance General.
-//
-// TODAVÍA NO portado: Flujo de Efectivo y Auditoría Anual (necesitan la
-// lógica de deduplicación por Notas de _flujo_efectivo_periodo(), que
-// separa Financiación/Conciliación del resto de "(no presupuestar)").
+// Puerto de render_estados_financieros() (app_presupuesto.py): Estado de
+// Resultados, Balance General, Flujo de Efectivo (con escritura — guarda el
+// saldo inicial/final real de un mes) y Auditoría Anual.
 
 const PaginaEstadosFinancieros = (() => {
   function render(container) {
@@ -13,11 +10,10 @@ const PaginaEstadosFinancieros = (() => {
       <div class="tabs" id="tabs-ef">
         <button class="tab-btn activo" data-tab="resultados">Estado de Resultados</button>
         <button class="tab-btn" data-tab="balance">Balance General</button>
+        <button class="tab-btn" data-tab="flujo">Flujo de Efectivo</button>
+        <button class="tab-btn" data-tab="auditoria">Auditoría Anual</button>
       </div>
       <div id="panel-ef">Cargando datos del Sheet…</div>
-      <div class="aviso">⚠️ Todavía no portados: Flujo de Efectivo y Auditoría Anual — usá
-      <a href="https://presupuesto-app-jmr.streamlit.app" target="_blank" rel="noopener">la versión de
-      Streamlit</a> para eso mientras tanto.</div>
     `;
     const tabsDiv = container.querySelector("#tabs-ef");
     const panel = container.querySelector("#panel-ef");
@@ -35,7 +31,9 @@ const PaginaEstadosFinancieros = (() => {
       panel.innerHTML = "Cargando datos del Sheet…";
       try {
         if (activo === "resultados") await renderEstadoResultados(panel);
-        else await renderBalanceGeneral(panel);
+        else if (activo === "balance") await renderBalanceGeneral(panel);
+        else if (activo === "flujo") await renderFlujoEfectivo(panel);
+        else await renderAuditoriaAnual(panel);
       } catch (err) {
         panel.innerHTML = `<div class="error">Error cargando el Sheet: ${err.message}</div>`;
         console.error(err);
@@ -205,6 +203,427 @@ const PaginaEstadosFinancieros = (() => {
       <h5>Patrimonio Neto</h5>
       <div class="metric-row">${metric("Activos − Pasivos (pesos)", fmtMoneda(patrimonioNeto))}</div>
     `;
+  }
+
+  // ---------------------------------------------------------------------
+  // Flujo de Efectivo
+  // ---------------------------------------------------------------------
+  async function renderFlujoEfectivo(panel) {
+    panel.innerHTML = `
+      <p class="caption">Cuánta plata entra y sale realmente de tu cuenta de ahorros en un mes — empezando por
+      cuánto tenías al arrancar. Se separa en Operación (tu día a día), Inversión (aportes a plataformas de
+      inversión), Financiación (cuotas de deuda pagadas automáticamente desde la cuenta) y Conciliación (pago
+      automático de tarjeta, intereses/4x1000, transferencias entre tus propias cuentas — no son gasto ni
+      ingreso real, pero sí mueven la plata de la cuenta).</p>
+      <div class="row"><select id="fe_anio"></select><select id="fe_mes"></select></div>
+      <div id="fe-contenido">Cargando…</div>
+    `;
+    const hoy = new Date();
+    const selAnio = panel.querySelector("#fe_anio");
+    const selMes = panel.querySelector("#fe_mes");
+    for (let a = 2023; a <= 2032; a++) selAnio.add(new Option(a, a));
+    selAnio.value = hoy.getFullYear();
+    for (let m = 1; m <= 12; m++) selMes.add(new Option(MESES_NOMBRE[m], m));
+    selMes.value = hoy.getMonth() + 1;
+
+    let datos = await IngresosGastosPeriodo.cargarDatosBase();
+
+    async function renderContenido() {
+      const contenido = panel.querySelector("#fe-contenido");
+      const anio = Number(selAnio.value);
+      const mesNum = Number(selMes.value);
+      const mesStr = `${anio}-${String(mesNum).padStart(2, "0")}`;
+      contenido.innerHTML = "Cargando…";
+
+      const existente = datos.conciliacion.find((f) => f.Mes === mesStr);
+      let saldoInicialPrev, saldoFinalPrev, avisoCadena = "";
+      if (existente) {
+        saldoInicialPrev = toNumber(existente.SaldoInicial);
+        saldoFinalPrev = toNumber(existente.SaldoFinal);
+      } else {
+        const { saldo, mesAncla } = IngresosGastosPeriodo.saldoInicialEncadenado(datos, anio, mesNum);
+        if (saldo === null) {
+          avisoCadena = `<div class="aviso">⚠️ No hay ningún saldo real guardado antes de ${mesStr} — el $0 de
+            abajo es solo un valor de partida, no un cálculo. Ingresá el saldo real de tu cuenta al cierre del
+            primer mes con datos (en el campo de abajo) para que la cadena de saldos arranque bien.</div>`;
+          saldoInicialPrev = 0;
+        } else {
+          avisoCadena = `<p class="caption">Saldo inicial calculado encadenando desde el último saldo real
+            guardado (${mesAncla}) más el flujo de los meses intermedios.</p>`;
+          saldoInicialPrev = saldo;
+        }
+        saldoFinalPrev = 0;
+      }
+
+      const coincide = (anio2, mes2) => anio2 === anio && mes2 === mesNum;
+      const d = IngresosGastosPeriodo.calcular(datos, coincide);
+      const fe = IngresosGastosPeriodo.calcularFlujoEfectivo(datos, coincide);
+
+      contenido.innerHTML = `
+        ${avisoCadena}
+        <div class="row">
+          <div class="campo"><label>Saldo inicial del mes</label><br>
+            <input type="number" step="any" id="fe_saldo_ini" value="${saldoInicialPrev}"></div>
+          <div class="campo"><label>Saldo final del mes (según tu extracto)</label><br>
+            <input type="number" step="any" id="fe_saldo_fin" value="${saldoFinalPrev}"></div>
+        </div>
+        <button type="button" id="fe_guardar">💾 Guardar saldos de este mes</button>
+        <div class="aviso" id="fe_msg" hidden></div>
+
+        <div class="metric-row">${metric("Saldo Inicial del Mes", fmtMoneda(saldoInicialPrev))}</div>
+
+        <h5>Flujo del mes</h5>
+        <div class="metric-row" id="fe_flujo_metrics"></div>
+        <div class="metric-row" id="fe_saldo_final_calc"></div>
+        <div id="fe_comparacion"></div>
+
+        <details>
+          <summary>🔎 Ver desglose del mes</summary>
+          <div id="fe_desglose"></div>
+        </details>
+      `;
+
+      function actualizarCalculo() {
+        const saldoInicial = Number(contenido.querySelector("#fe_saldo_ini").value) || 0;
+        const saldoFinalManual = Number(contenido.querySelector("#fe_saldo_fin").value) || 0;
+        const flujoOperacion = d.totalIngresos - d.gasto_operativo - d.descuentosNomina;
+        const flujoInversion = -d.gasto_inversiones;
+        const flujoFinanciacion = -fe.pagoDeuda;
+        const flujoConciliacion = fe.flujoConciliacion;
+        const saldoFinalCalculado = saldoInicial + flujoOperacion + flujoInversion + flujoFinanciacion + flujoConciliacion;
+
+        contenido.querySelector("#fe_flujo_metrics").innerHTML = `
+          ${metric("Operación", fmtMoneda(flujoOperacion))}
+          ${metric("Inversión", fmtMoneda(flujoInversion))}
+          ${metric("Financiación", fmtMoneda(flujoFinanciacion))}
+          ${metric("Conciliación", fmtMoneda(flujoConciliacion))}
+        `;
+        contenido.querySelector("#fe_saldo_final_calc").innerHTML = metric("Saldo Final Calculado", fmtMoneda(saldoFinalCalculado));
+
+        const comparacionDiv = contenido.querySelector("#fe_comparacion");
+        if (!(saldoInicial === 0 && saldoFinalManual === 0)) {
+          const diferencia = saldoFinalCalculado - saldoFinalManual;
+          comparacionDiv.innerHTML = Math.abs(diferencia) > 100
+            ? `<div class="aviso">El saldo calculado no cuadra con el saldo final que ingresaste — diferencia
+               de ${fmtMoneda(diferencia)}. Revisá si falta cargar algún movimiento de este mes.</div>`
+            : `<div class="ok">✅ Cuadra con el saldo final ingresado (${fmtMoneda(saldoFinalManual)}).</div>`;
+        } else {
+          comparacionDiv.innerHTML = "";
+        }
+      }
+      contenido.querySelector("#fe_saldo_ini").addEventListener("input", actualizarCalculo);
+      contenido.querySelector("#fe_saldo_fin").addEventListener("input", actualizarCalculo);
+      actualizarCalculo();
+
+      contenido.querySelector("#fe_desglose").innerHTML = renderDesgloseFlujo(datos, coincide, d);
+
+      contenido.querySelector("#fe_guardar").addEventListener("click", async () => {
+        const btn = contenido.querySelector("#fe_guardar");
+        const msg = contenido.querySelector("#fe_msg");
+        const saldoInicial = Number(contenido.querySelector("#fe_saldo_ini").value) || 0;
+        const saldoFinalManual = Number(contenido.querySelector("#fe_saldo_fin").value) || 0;
+        btn.disabled = true;
+        btn.textContent = "Guardando…";
+        try {
+          await guardarConciliacionEfectivo(mesStr, saldoInicial, saldoFinalManual);
+          datos = await IngresosGastosPeriodo.cargarDatosBase();
+          mostrarMsgEF(msg, `Saldos de ${mesStr} guardados.`, false);
+          await renderContenido();
+        } catch (err) {
+          mostrarMsgEF(msg, `No pude guardar: ${err.message}`, true);
+          console.error(err);
+          btn.disabled = false;
+          btn.textContent = "💾 Guardar saldos de este mes";
+        }
+      });
+    }
+
+    selAnio.addEventListener("change", renderContenido);
+    selMes.addEventListener("change", renderContenido);
+    await renderContenido();
+  }
+
+  function mostrarMsgEF(el, texto, esError) {
+    el.hidden = false;
+    el.textContent = texto;
+    el.style.background = esError ? "#f8d7da" : "#d1e7dd";
+    el.style.color = esError ? "#842029" : "#0f5132";
+  }
+
+  function tablaCategoriasHTML(dict) {
+    const entradas = Object.entries(dict).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1]));
+    if (!entradas.length) return '<p class="caption">Nada este mes.</p>';
+    return `<table class="tabla"><thead><tr><th>Categoría</th><th>Valor</th></tr></thead>
+      <tbody>${entradas.map(([c, v]) => `<tr><td>${c}</td><td>${fmtMoneda(v)}</td></tr>`).join("")}</tbody></table>`;
+  }
+
+  function tablaMovimientosHTML(filas) {
+    if (!filas.length) return '<p class="caption">Nada este mes.</p>';
+    const ordenadas = [...filas].sort((a, b) => (parseFechaISO(a.fecha) || "").localeCompare(parseFechaISO(b.fecha) || ""));
+    return `<table class="tabla"><thead><tr><th>Fecha</th><th>Comercio / Concepto</th><th>Categoría</th><th>Valor</th></tr></thead>
+      <tbody>${ordenadas.map((f) => `<tr><td>${f.fecha ?? ""}</td><td>${f.comercio ?? ""}</td>
+        <td>${f.categoria ?? ""}</td><td>${fmtMoneda(f.valor)}</td></tr>`).join("")}</tbody></table>`;
+  }
+
+  // Puerto de _render_desglose_flujo_efectivo() (app_presupuesto.py):
+  // detalle línea por línea de las 4 categorías del flujo del mes.
+  function renderDesgloseFlujo(datos, coincide, d) {
+    const gastoOperativoSinInv = Object.fromEntries(Object.entries(d.gastoPorCategoria).filter(([k]) => k !== "Inversiones"));
+
+    const descPorCategoria = {};
+    for (const fila of datos.colillasDescuentos) {
+      const [anio, mes] = extraerAnioMes(fila.Quincena);
+      if (coincide(anio, mes)) descPorCategoria[fila.Categoria] = (descPorCategoria[fila.Categoria] || 0) + toNumber(fila.Valor);
+    }
+
+    const movInversion = [];
+    for (const bloque of [datos.efectivoDetalle, datos.visaDetalle, datos.mcDetalle]) {
+      for (const fila of bloque) {
+        const [anio, mes] = extraerAnioMes(fila.FechaCompra);
+        if (coincide(anio, mes) && fila.Categoria === "Inversiones") {
+          movInversion.push({ fecha: fila.FechaCompra, comercio: fila.Comercio, categoria: fila.Categoria, valor: toNumber(fila.ValorCargado) });
+        }
+      }
+    }
+
+    const movFinanciacion = [];
+    for (const fila of datos.efectivoDetalle) {
+      const [anio, mes] = extraerAnioMes(fila.FechaCompra);
+      if (coincide(anio, mes) && fila.Categoria === "Pago de deuda (no presupuestar)") {
+        movFinanciacion.push({ fecha: fila.FechaCompra, comercio: fila.Comercio, categoria: fila.Categoria, valor: toNumber(fila.ValorCargado) });
+      }
+    }
+
+    const entradasConciliacion = [];
+    for (const fila of datos.otrosIngresos) {
+      const [anio, mes] = extraerAnioMes(fila.Fecha);
+      const notasLower = String(fila.Notas || "").toLowerCase();
+      const dup = notasLower.includes("no duplicar") || notasLower.includes("ya contabilizad");
+      if (coincide(anio, mes) && esNoPresupuestar(fila.Categoria) && !dup) {
+        entradasConciliacion.push({ fecha: fila.Fecha, comercio: fila.Concepto, categoria: fila.Categoria, valor: toNumber(fila.Valor) });
+      }
+    }
+
+    const salidasConciliacion = [];
+    for (const fila of datos.efectivoDetalle) {
+      const [anio, mes] = extraerAnioMes(fila.FechaCompra);
+      const dup = String(fila.Notas || "").toLowerCase().includes("ya contabilizad");
+      if (coincide(anio, mes) && fila.Categoria !== "Pago de deuda (no presupuestar)" && esNoPresupuestar(fila.Categoria) && !dup) {
+        salidasConciliacion.push({ fecha: fila.FechaCompra, comercio: fila.Comercio, categoria: fila.Categoria, valor: toNumber(fila.ValorCargado) });
+      }
+    }
+
+    return `
+      <p class="caption"><strong>Operación</strong></p>
+      <div class="col-3">
+        <div><p class="caption">Ingresos por categoría</p>${tablaCategoriasHTML(d.ingresosPorCategoria)}</div>
+        <div><p class="caption">Gasto operativo por categoría</p>${tablaCategoriasHTML(gastoOperativoSinInv)}</div>
+        <div><p class="caption">Descuentos de nómina por categoría</p>${tablaCategoriasHTML(descPorCategoria)}</div>
+      </div>
+
+      <p class="caption"><strong>Inversión</strong> (aportes a plataformas de inversión)</p>
+      ${tablaMovimientosHTML(movInversion)}
+
+      <p class="caption"><strong>Financiación</strong> (cuotas de deuda pagadas automáticamente)</p>
+      ${tablaMovimientosHTML(movFinanciacion)}
+
+      <p class="caption"><strong>Conciliación</strong> (pago automático de tarjeta ya contado en Operación,
+      intereses/4x1000, transferencias entre tus propias cuentas, traslados de/hacia fondos de inversión)</p>
+      <div class="col-2">
+        <div><p class="caption">Entradas de conciliación (Otros Ingresos)</p>${tablaMovimientosHTML(entradasConciliacion)}</div>
+        <div><p class="caption">Salidas de conciliación (Egresos - Efectivo)</p>${tablaMovimientosHTML(salidasConciliacion)}</div>
+      </div>
+    `;
+  }
+
+  // Puerto de guardar_conciliacion_efectivo() (sheets_backend.py): busca la
+  // fila existente por Mes (clave) y actualiza en el lugar, o la agrega al
+  // final si es la primera vez que se guarda ese mes.
+  async function firstBlankRowConciliacion() {
+    const raw = await SheetsApi.batchGet(["conciliacion_efectivo"]);
+    const filas = raw.conciliacion_efectivo || [];
+    let ultimoUsado = 0;
+    filas.forEach((r, i) => { if (r && r[0] !== undefined && r[0] !== null && r[0] !== "") ultimoUsado = i + 1; });
+    return 66 + ultimoUsado;
+  }
+
+  async function guardarConciliacionEfectivo(mes, saldoInicial, saldoFinal) {
+    const raw = await SheetsApi.batchGet(["conciliacion_efectivo"]);
+    const filas = raw.conciliacion_efectivo || [];
+    let filaExistente = null;
+    for (let i = 0; i < filas.length; i++) {
+      if (filas[i] && filas[i][0] === mes) { filaExistente = 66 + i; break; }
+    }
+    const fechaRegistro = new Date().toISOString().slice(0, 10);
+    if (filaExistente) {
+      await SheetsApi.updateRange(`'Balance Mensual'!B${filaExistente}:D${filaExistente}`, [[saldoInicial, saldoFinal, fechaRegistro]]);
+    } else {
+      const fila = await firstBlankRowConciliacion();
+      await SheetsApi.updateRange(`'Balance Mensual'!A${fila}:D${fila}`, [[`'${mes}`, saldoInicial, saldoFinal, fechaRegistro]]);
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Auditoría Anual
+  // ---------------------------------------------------------------------
+  async function renderAuditoriaAnual(panel) {
+    panel.innerHTML = `
+      <p class="caption">Para un año completo: ingresos y gastos discriminados por categoría, y si el saldo
+      calculado a fin de año cuadra contra el saldo real que tenías el 31 de diciembre — para auditar un año
+      contra tus extractos antes de confiar en el presupuesto hacia adelante.</p>
+      <select id="aud_anio"></select>
+      <div id="aud-contenido">Cargando…</div>
+    `;
+    const hoy = new Date();
+    const selAnio = panel.querySelector("#aud_anio");
+    for (let a = 2023; a <= 2032; a++) selAnio.add(new Option(a, a));
+    selAnio.value = hoy.getFullYear();
+
+    const datos = await IngresosGastosPeriodo.cargarDatosBase();
+
+    async function renderContenido() {
+      const contenido = panel.querySelector("#aud-contenido");
+      const anioAud = Number(selAnio.value);
+      contenido.innerHTML = "Cargando…";
+
+      const mesDicAnterior = `${anioAud - 1}-12`;
+      const mesDic = `${anioAud}-12`;
+      const filaDicAnt = datos.conciliacion.find((f) => f.Mes === mesDicAnterior);
+      const filaDic = datos.conciliacion.find((f) => f.Mes === mesDic);
+
+      let saldoInicialReal, mesAnclaAud = null;
+      if (filaDicAnt) {
+        saldoInicialReal = toNumber(filaDicAnt.SaldoFinal);
+      } else {
+        const r = IngresosGastosPeriodo.saldoInicialEncadenado(datos, anioAud, 1);
+        saldoInicialReal = r.saldo;
+        mesAnclaAud = r.mesAncla;
+      }
+      const saldoFinalReal = filaDic ? toNumber(filaDic.SaldoFinal) : null;
+
+      let avisos = "";
+      if (saldoInicialReal === null) {
+        avisos += `<div class="aviso">⚠️ No hay ningún saldo real guardado antes de ${mesDicAnterior} —
+          cargalo en Flujo de Efectivo para poder auditar ${anioAud} contra tu extracto real. Mientras tanto
+          se asume $0 como arranque.</div>`;
+      } else if (!filaDicAnt) {
+        avisos += `<p class="caption">Saldo de arranque de ${mesDicAnterior} calculado encadenando desde el
+          último saldo real guardado (${mesAnclaAud}) más el flujo de los meses intermedios.</p>`;
+      }
+      if (saldoFinalReal === null) {
+        avisos += `<div class="aviso">⚠️ Tampoco hay un saldo guardado para ${mesDic} — cargalo también para
+          poder comparar el cierre de ${anioAud}.</div>`;
+      }
+
+      const coincideAnio = (anio2) => anio2 === anioAud;
+      const d = IngresosGastosPeriodo.calcular(datos, coincideAnio);
+      const fe = IngresosGastosPeriodo.calcularFlujoEfectivo(datos, coincideAnio);
+
+      const ingresosCat = Object.entries(d.ingresosPorCategoria).sort((a, b) => b[1] - a[1]);
+      const totalGastos = d.gasto_operativo + d.descuentosNomina;
+      const gastoCatSinInv = Object.entries(d.gastoPorCategoria).filter(([k]) => k !== "Inversiones").sort((a, b) => b[1] - a[1]);
+      const utilidadNeta = d.totalIngresos - totalGastos;
+
+      const flujoOperacion = d.totalIngresos - d.gasto_operativo - d.descuentosNomina;
+      const flujoInversion = -d.gasto_inversiones;
+      const flujoFinanciacion = -fe.pagoDeuda;
+      const flujoConciliacion = fe.flujoConciliacion;
+      const saldoInicialCalc = saldoInicialReal !== null ? saldoInicialReal : 0;
+      const saldoFinalCalculado = saldoInicialCalc + flujoOperacion + flujoInversion + flujoFinanciacion + flujoConciliacion;
+
+      let comparacionHtml = "";
+      if (saldoFinalReal !== null) {
+        const diferencia = saldoFinalCalculado - saldoFinalReal;
+        comparacionHtml = Math.abs(diferencia) > 100
+          ? `<div class="aviso">⚠️ El saldo calculado no cuadra contra el saldo real de ${mesDic} — diferencia
+             de ${fmtMoneda(diferencia)}. Mirá el detalle mes a mes de abajo para ubicar en qué mes se rompe
+             la cadena.</div>`
+          : `<div class="ok">✅ Cuadra contra el saldo real de ${mesDic} (${fmtMoneda(saldoFinalReal)}).</div>`;
+      }
+
+      contenido.innerHTML = `
+        ${avisos}
+        <h5>Ingresos del año, por categoría</h5>
+        ${ingresosCat.length ? `<div class="tabla-scroll"><table class="tabla"><thead><tr><th>Categoría</th><th>Valor</th></tr></thead>
+          <tbody>${ingresosCat.map(([c, v]) => `<tr><td>${c}</td><td>${fmtMoneda(v)}</td></tr>`).join("")}</tbody></table></div>`
+          : `<p class="caption">No hay ingresos cargados para ${anioAud}.</p>`}
+        <div class="metric-row">${metric(`Total Ingresos ${anioAud}`, fmtMoneda(d.totalIngresos))}</div>
+
+        <h5>Gastos del año, por categoría</h5>
+        ${gastoCatSinInv.length ? `<div class="tabla-scroll"><table class="tabla"><thead><tr><th>Categoría</th><th>Valor</th></tr></thead>
+          <tbody>${gastoCatSinInv.map(([c, v]) => `<tr><td>${c}</td><td>${fmtMoneda(v)}</td></tr>`).join("")}</tbody></table></div>`
+          : `<p class="caption">No hay gastos cargados para ${anioAud}.</p>`}
+        <div class="metric-row">${metric(`Total Gastos ${anioAud}`, fmtMoneda(totalGastos))}</div>
+        ${d.gastoSinCategorizar > 0 ? `<div class="aviso">⚠️ ${fmtMoneda(d.gastoSinCategorizar)} de ${anioAud}
+          sigue en la categoría genérica 'Otros' — revisalo para que esta auditoría sea confiable.</div>` : ""}
+        ${d.descuentos_sin_categorizar > 100 ? `<div class="aviso">⚠️ ${fmtMoneda(d.descuentos_sin_categorizar)}
+          de los descuentos de nómina de ${anioAud} no tiene detalle categorizado en 'Colillas de Pago' — el
+          total sí está bien, pero falta desglosarlo ítem por ítem.</div>` : ""}
+
+        <h5>Utilidad Neta del año</h5>
+        <div class="metric-row">${metric(`Utilidad Neta ${anioAud}`, fmtMoneda(utilidadNeta))}</div>
+
+        <hr>
+        <h5>Reconciliación de caja del año (cuenta de ahorros)</h5>
+        <p class="caption">Mismas cuatro categorías que Flujo de Efectivo (Operación/Inversión/Financiación/
+        Conciliación), acumuladas para el año completo — arrancando del saldo real de diciembre del año
+        anterior.</p>
+        <div class="metric-row">
+          ${metric("Operación", fmtMoneda(flujoOperacion))}
+          ${metric("Inversión", fmtMoneda(flujoInversion))}
+          ${metric("Financiación", fmtMoneda(flujoFinanciacion))}
+          ${metric("Conciliación", fmtMoneda(flujoConciliacion))}
+        </div>
+        <div class="metric-row">
+          ${metric(`Saldo Inicial (${anioAud - 1}-12-31)`, fmtMoneda(saldoInicialCalc))}
+          ${metric(`Saldo Final Calculado (${anioAud}-12-31)`, fmtMoneda(saldoFinalCalculado))}
+        </div>
+        ${comparacionHtml}
+
+        <details>
+          <summary>Ver detalle mes a mes</summary>
+          <div class="tabla-scroll" style="max-height:440px;"><table class="tabla" id="aud_mes_tabla"></table></div>
+          <p class="caption">El 'Saldo Final Calculado' es la cadena acumulada mes a mes desde el saldo real
+          de diciembre anterior — no depende de si guardaste un saldo manual ese mes en particular. 'Saldo
+          Final Real' solo aparece si guardaste una conciliación para ese mes específico en Flujo de
+          Efectivo.</p>
+        </details>
+      `;
+
+      const filasMes = [];
+      let saldoCorrida = saldoInicialCalc;
+      for (let m = 1; m <= 12; m++) {
+        const coincideMes = (anio2, mes2) => anio2 === anioAud && mes2 === m;
+        const dm = IngresosGastosPeriodo.calcular(datos, coincideMes);
+        const fm = IngresosGastosPeriodo.calcularFlujoEfectivo(datos, coincideMes);
+        const fo = dm.totalIngresos - dm.gasto_operativo - dm.descuentosNomina;
+        const fi = -dm.gasto_inversiones;
+        const ff = -fm.pagoDeuda;
+        const fc = fm.flujoConciliacion;
+        const saldoIniMes = saldoCorrida;
+        const saldoFinMes = saldoIniMes + fo + fi + ff + fc;
+        saldoCorrida = saldoFinMes;
+        const mesStr = `${anioAud}-${String(m).padStart(2, "0")}`;
+        const filaReal = datos.conciliacion.find((f) => f.Mes === mesStr);
+        const saldoRealMes = filaReal ? toNumber(filaReal.SaldoFinal) : null;
+        const diffMes = saldoRealMes !== null ? saldoFinMes - saldoRealMes : null;
+        filasMes.push({
+          mes: mesStr, ingresos: dm.totalIngresos, gastos: dm.gasto_operativo + dm.descuentosNomina,
+          saldoCalc: saldoFinMes, saldoReal: saldoRealMes, diff: diffMes,
+        });
+      }
+      contenido.querySelector("#aud_mes_tabla").innerHTML = `
+        <thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos</th><th>Saldo Final Calculado</th>
+          <th>Saldo Final Real</th><th>Diferencia</th></tr></thead>
+        <tbody>${filasMes.map((f) => `<tr><td>${f.mes}</td><td>${fmtMoneda(f.ingresos)}</td>
+          <td>${fmtMoneda(f.gastos)}</td><td>${fmtMoneda(f.saldoCalc)}</td>
+          <td>${f.saldoReal !== null ? fmtMoneda(f.saldoReal) : "-"}</td>
+          <td>${f.diff !== null ? fmtMoneda(f.diff) : "-"}</td></tr>`).join("")}</tbody>
+      `;
+    }
+
+    selAnio.addEventListener("change", renderContenido);
+    await renderContenido();
   }
 
   function metric(label, value) {
