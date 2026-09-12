@@ -20,7 +20,14 @@ const CONFIG = {
 // salgan idénticos a los de la app de Streamlit.
 const RANGOS = {
   colillas_resumen: "'Colillas de Pago'!A150:G294",
+  colillas_devengos: "'Colillas de Pago'!A326:D531",
+  colillas_descuentos: "'Colillas de Pago'!A545:D2010",
   otros_ingresos: "'Otros Ingresos'!A4:E5263",
+  efectivo_detalle: "'Egresos - Efectivo'!A15:K1999",
+  visa_detalle: "'Egresos - Tarjeta Visa 7497'!A15:K5614",
+  mc_detalle: "'Egresos - Mastercard 5922'!A15:K5601",
+  aportes_inversion_pesos: "'Inversiones - Pesos'!A79:D1000",
+  aportes_inversion_dolares: "'Inversiones - Dólares'!A79:D1000",
   deudas: "'Deudas - Resumen'!A5:H10",
   resumen_kpis: "'Resumen'!B5:E18",
 };

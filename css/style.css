@@ -123,7 +123,25 @@ select {
 @media (prefers-color-scheme: dark) {
   .aviso { background: #4a3b0a; color: #ffe69c; }
 }
+.ok {
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #d1e7dd;
+  color: #0f5132;
+}
+@media (prefers-color-scheme: dark) {
+  .ok { background: #0f3d2a; color: #a3d9b8; }
+}
 .error { color: var(--accent); }
+
+h6 { margin: 16px 0 4px; font-size: 0.85rem; color: var(--text-muted); text-transform: none; }
+
+details { margin: 12px 0; }
+details summary { cursor: pointer; color: var(--accent); font-weight: 500; }
+.tabla { border-collapse: collapse; width: 100%; margin-top: 8px; font-size: 0.9rem; }
+.tabla th, .tabla td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.tabla th { color: var(--text-muted); font-weight: 500; }
 
 @media (max-width: 700px) {
   #app { flex-direction: column; }

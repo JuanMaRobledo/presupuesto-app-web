@@ -16,13 +16,15 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
 
 ✅ Portado:
 - Login con Google (OAuth del lado del navegador, sin backend)
-- 🏠 Resumen — solo las tarjetas de **Ingresos**, **Deudas** e **Inversiones**
-  (estado actual), con el selector Total histórico / Un año / Un mes
+- 🏠 Resumen — **completo**: Ingresos, Gastos, Balance (con tasa de ahorro
+  discriminada por origen — efectivo/ahorro/inversión, incluyendo el cruce
+  de cada movimiento "Inversiones" contra la plataforma real y el neteo de
+  retiros), Deudas e Inversiones (estado actual), con el selector Total
+  histórico / Un año / Un mes. Verificado con casos de prueba calculados a
+  mano y comparados contra la lógica de `_ingresos_gastos_periodo()`.
 
 ⏳ Todavía no portado (usá la versión de Streamlit mientras tanto):
-- 💳 Gastos y ⚖️ Balance dentro de Resumen (necesita portar la categorización
-  de gasto real + el cruce contra plataformas de inversión — es la lógica
-  más intrincada de toda la app, se está portando aparte)
+- El gráfico de "Tendencia de los últimos meses" al pie de Resumen
 - 📊 Análisis, 📋 Presupuesto, 🏦 Deudas (detalle), 📈 Inversiones (detalle),
   🏢 Estados Financieros, 💰 Ingresos, 💳 Egresos, 🧾 Facturación Electrónica,
   📑 Declaraciones de Renta

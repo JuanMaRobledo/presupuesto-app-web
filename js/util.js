@@ -70,6 +70,19 @@ function extraerAnioMes(periodo) {
   return [null, null];
 }
 
+// Convierte 'dd/mm/yyyy' o 'yyyy-mm-dd' a 'yyyy-mm-dd' (para usar como clave
+// de comparación de fechas, equivalente a pd.to_datetime(..., dayfirst=True)
+// .date() del lado de Python). null si el formato no matchea.
+function parseFechaISO(s) {
+  if (!s) return null;
+  const str = String(s).trim();
+  let m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (m) return `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+  return null;
+}
+
 // Convierte las filas crudas de un rango (array de arrays) en objetos, según
 // una lista de nombres de columna en el mismo orden que llegan de la API.
 function filasAObjetos(filas, columnas) {
