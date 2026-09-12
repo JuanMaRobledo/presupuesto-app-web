@@ -1,14 +1,12 @@
-// Puerto (parcial) de render_presupuesto() (app_presupuesto.py) — la hoja
+// Puerto de render_presupuesto() (app_presupuesto.py) — la hoja
 // 'Presupuesto' funciona distinto a las demás: la celda B5 es un selector
 // de mes que las fórmulas de la hoja usan para calcular "Gasto Real" de
 // cada categoría, así que hay que ESCRIBIR el mes ahí antes de poder LEER
 // el gasto real de ese mes (mismo protocolo que set_presupuesto_mes() +
 // read_presupuesto() en Python). Por eso esta página no puede ser de solo
-// lectura como las demás.
-//
-// TODAVÍA NO portado: el botón "💡 Sugerir metas" (necesita
-// _gasto_real_categoria_mes()/_descuentos_categoria_mes(), un promedio de
-// los últimos 3 meses — se puede agregar después).
+// lectura como las demás. Incluye "💡 Sugerir metas" (puerto de
+// _gasto_real_categoria_mes()/_descuentos_categoria_mes()): promedio de
+// gasto real de los últimos 3 meses con datos, por categoría.
 
 const PaginaPresupuesto = (() => {
   let mesAplicado = null;
@@ -41,6 +39,75 @@ const PaginaPresupuesto = (() => {
     }
     const raw = await SheetsApi.batchGet(["presupuesto"]);
     return parsePresupuesto(raw.presupuesto || []);
+  }
+
+  // Puerto de _gasto_real_categoria_mes()/_descuentos_categoria_mes()
+  // (app_presupuesto.py) — gasto real por categoría de un mes puntual, en
+  // la misma convención "efectivo real" que usa la columna 'Gasto Real' de
+  // la hoja Presupuesto: el efectivo cuenta en su propio mes, las tarjetas
+  // en el mes siguiente al extracto (cuando se pagan). Los descuentos de
+  // nómina se agrupan por quincena de pago, no por extracto.
+  const EGRESO_COLS_SUGERIR = [
+    "PeriodoExtracto", "FechaCompra", "Comercio", "Moneda", "Cuotas", "ValorTotal",
+    "ValorCargado", "SaldoPendiente", "Categoria", "Reembolsable", "Notas",
+  ];
+
+  async function sugerirMetas(p) {
+    const hoy = new Date();
+    const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}`;
+    const mesesPrev = [1, 2, 3].map((i) => shiftMes(mesActual, -i));
+
+    const raw = await SheetsApi.batchGet(["efectivo_detalle", "visa_detalle", "mc_detalle", "colillas_descuentos"]);
+    const efectivo = filasAObjetos(raw.efectivo_detalle, EGRESO_COLS_SUGERIR, ["FechaCompra"]);
+    const visa = filasAObjetos(raw.visa_detalle, EGRESO_COLS_SUGERIR, ["FechaCompra"]);
+    const mc = filasAObjetos(raw.mc_detalle, EGRESO_COLS_SUGERIR, ["FechaCompra"]);
+    const descuentos = filasAObjetos(raw.colillas_descuentos, ["Quincena", "Concepto", "Categoria", "Valor"]);
+
+    function gastoRealCategoriaMes(mesStr) {
+      const mesCorteTarjetas = shiftMes(mesStr, -1);
+      const totales = {};
+      for (const [filas, mesObjetivo] of [[efectivo, mesStr], [visa, mesCorteTarjetas], [mc, mesCorteTarjetas]]) {
+        for (const f of filas) {
+          if (f.Moneda === "COP" && !esNoPresupuestar(f.Categoria) && f.PeriodoExtracto === mesObjetivo) {
+            totales[f.Categoria] = (totales[f.Categoria] || 0) + toNumber(f.ValorCargado);
+          }
+        }
+      }
+      return totales;
+    }
+
+    function descuentosCategoriaMes(mesStr) {
+      const anioObj = Number(mesStr.slice(0, 4));
+      const mesObj = Number(mesStr.slice(5, 7));
+      const totales = {};
+      for (const d of descuentos) {
+        const [a, m] = extraerAnioMes(d.Quincena);
+        if (a === anioObj && m === mesObj) totales[d.Categoria] = (totales[d.Categoria] || 0) + toNumber(d.Valor);
+      }
+      return totales;
+    }
+
+    const catPorMes = mesesPrev.map(gastoRealCategoriaMes);
+    const descPorMes = mesesPrev.map(descuentosCategoriaMes);
+
+    const promedioRedondeado = (valores) => {
+      const noCero = valores.filter((v) => v > 0);
+      if (!noCero.length) return null;
+      const promedio = noCero.reduce((s, v) => s + v, 0) / noCero.length;
+      return Math.round(promedio / 1000) * 1000;
+    };
+
+    const sugerenciasCat = {};
+    for (const cat of p.categorias) {
+      const sugerido = promedioRedondeado(catPorMes.map((d) => d[cat.categoria] || 0));
+      if (sugerido !== null) sugerenciasCat[cat.fila] = sugerido;
+    }
+    const sugerenciasDesc = {};
+    for (const desc of p.descuentos) {
+      const sugerido = promedioRedondeado(descPorMes.map((d) => d[desc.categoria] || 0));
+      if (sugerido !== null) sugerenciasDesc[desc.fila] = sugerido;
+    }
+    return { sugerenciasCat, sugerenciasDesc, mesesPrev };
   }
 
   async function render(container) {
@@ -92,6 +159,9 @@ const PaginaPresupuesto = (() => {
         </div>`;
 
       contenido.innerHTML = `
+        <button type="button" id="pr_sugerir">💡 Sugerir metas según el promedio de los últimos meses con datos</button>
+        <div class="aviso" id="pr_sugerir_msg" hidden></div>
+
         <h4>Metas por categoría de gasto</h4>
         ${p.categorias.length ? p.categorias.map((c) => filaHtml(c, "gasto_real", "Gasto real", "meta_cat")).join("") : "<p class=\"caption\">Sin categorías.</p>"}
 
@@ -106,14 +176,48 @@ const PaginaPresupuesto = (() => {
         <div id="pr_chart_wrap"></div>
       `;
 
+      function actualizarDisponible(input) {
+        const fila = input.dataset.fila;
+        const base = Number(input.dataset.base);
+        const meta = Number(input.value) || 0;
+        const dispEl = contenido.querySelector(`#disp_${fila}`);
+        dispEl.textContent = meta > 0 ? `${fmtMoneda(meta - base)} disponible` : "—";
+      }
+
       contenido.querySelectorAll(".input-meta").forEach((input) => {
-        input.addEventListener("input", () => {
-          const fila = input.dataset.fila;
-          const base = Number(input.dataset.base);
-          const meta = Number(input.value) || 0;
-          const dispEl = contenido.querySelector(`#disp_${fila}`);
-          dispEl.textContent = meta > 0 ? `${fmtMoneda(meta - base)} disponible` : "—";
-        });
+        input.addEventListener("input", () => actualizarDisponible(input));
+      });
+
+      contenido.querySelector("#pr_sugerir").addEventListener("click", async () => {
+        const btnSug = contenido.querySelector("#pr_sugerir");
+        const msgSug = contenido.querySelector("#pr_sugerir_msg");
+        btnSug.disabled = true;
+        btnSug.textContent = "Calculando…";
+        try {
+          const { sugerenciasCat, sugerenciasDesc, mesesPrev } = await sugerirMetas(p);
+          for (const [fila, valor] of Object.entries(sugerenciasCat)) {
+            const input = contenido.querySelector(`#meta_cat_${fila}`);
+            if (input) { input.value = valor; actualizarDisponible(input); }
+          }
+          for (const [fila, valor] of Object.entries(sugerenciasDesc)) {
+            const input = contenido.querySelector(`#meta_desc_${fila}`);
+            if (input) { input.value = valor; actualizarDisponible(input); }
+          }
+          msgSug.hidden = false;
+          msgSug.style.background = "#d1e7dd";
+          msgSug.style.color = "#0f5132";
+          msgSug.textContent = `Metas sugeridas con el promedio de ${mesesPrev.join(", ")} (donde hubo datos) —
+            revisalas y ajustalas antes de guardar.`;
+        } catch (err) {
+          msgSug.hidden = false;
+          msgSug.style.background = "#f8d7da";
+          msgSug.style.color = "#842029";
+          msgSug.textContent = `No pude calcular la sugerencia: ${err.message}`;
+          console.error(err);
+        } finally {
+          btnSug.disabled = false;
+          btnSug.textContent = "💡 Sugerir metas según el promedio de los últimos meses con datos";
+        }
       });
 
       contenido.querySelector("#pr_guardar").addEventListener("click", async () => {

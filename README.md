@@ -89,13 +89,17 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   lados, mismo selector Total histórico/Un año/Un mes que Resumen — ahora
   comparten la lógica de cálculo vía `js/ingresos-gastos.js`) y **Balance
   General** (Activos − Pasivos = Patrimonio Neto, foto de hoy).
-- 📋 Presupuesto — **con escritura**: metas mensuales por categoría de gasto
-  y por descuento de nómina, comparadas contra el gasto real (que calculan
-  las fórmulas de la propia hoja 'Presupuesto' — la página escribe el mes
-  elegido en la celda selectora B5 antes de leer, mismo protocolo que
-  `set_presupuesto_mes()` + `read_presupuesto()`), con "disponible" en vivo
-  al escribir una meta y el gráfico de comparación. Único el botón "💡
-  Sugerir metas" no está portado.
+- 📋 Presupuesto — **completo, con escritura**: metas mensuales por
+  categoría de gasto y por descuento de nómina, comparadas contra el
+  gasto real (que calculan las fórmulas de la propia hoja 'Presupuesto' —
+  la página escribe el mes elegido en la celda selectora B5 antes de leer,
+  mismo protocolo que `set_presupuesto_mes()` + `read_presupuesto()`), con
+  "disponible" en vivo al escribir una meta, el gráfico de comparación, y
+  "💡 Sugerir metas según el promedio de los últimos meses con datos"
+  (mismo criterio "efectivo real" que la columna 'Gasto Real' — el
+  efectivo cuenta en su propio mes, las tarjetas en el mes siguiente al
+  extracto; solo sugiere sobre categorías con al menos un mes de los
+  últimos 3 con gasto > 0, redondeado al millar más cercano).
 
 ⏳ Todavía no portado (usá la versión de Streamlit mientras tanto):
 - El gráfico de "Tendencia de los últimos meses" al pie de Resumen — lee el
@@ -112,8 +116,6 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
 - Dentro de Estados Financieros: Flujo de Efectivo y Auditoría Anual
   (necesitan la lógica de deduplicación por Notas que separa
   Financiación/Conciliación del resto de movimientos "no presupuestar")
-- Dentro de Presupuesto: el botón "💡 Sugerir metas" (promedio de los
-  últimos 3 meses)
 - Todas las secciones de nivel superior de la app ya están portadas — lo
   que queda son sub-secciones puntuales (arriba) y operaciones de
   escritura sueltas (agregar/editar/borrar una fila puntual) en las
