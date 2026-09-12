@@ -22,8 +22,10 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   discriminada por origen — efectivo/ahorro/inversión, incluyendo el cruce
   de cada movimiento "Inversiones" contra la plataforma real y el neteo de
   retiros), Deudas e Inversiones (estado actual), con el selector Total
-  histórico / Un año / Un mes. Verificado con casos de prueba calculados a
-  mano y comparados contra la lógica de `_ingresos_gastos_periodo()`.
+  histórico / Un año / Un mes, y al pie "📊 Tendencia de los últimos meses"
+  (vista efectivo real, leyendo la hoja 'Resumen Mensual'). Verificado con
+  casos de prueba calculados a mano y comparados contra la lógica de
+  `_ingresos_gastos_periodo()` / `read_resumen_mensual()`.
 - 💳 Egresos — **completo, con escritura**: tabla de Efectivo/Visa/Mastercard
   (sub-tabs), con búsqueda, filtro de categoría/año/mes, "ocultar no
   presupuestar", y para las tarjetas el toggle Consumo (mes de compra) /
@@ -90,20 +92,26 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   `guardar_declaracion_renta()`. Es la primera sección con escritura del
   sitio: necesita el scope completo de Sheets + `drive.file` (ver más
   abajo).
-- 📊 Análisis — sub-tabs **Categorías** (gasto real histórico por categoría,
-  gráfico + tabla), **Esenciales / No Esenciales** (gasto de consumo real
-  en pesos clasificado con `clasificar_esencial()` — la hoja 'Categorías
-  Esenciales' tiene prioridad sobre la clasificación por defecto —, con
-  gráfico de torta, detalle por categoría y aviso de categorías sin
-  clasificar todavía), **Movimientos** (vista unificada devengado de las 7
-  fuentes: colillas devengo/descuento, Visa, Mastercard COP/USD, Cuenta de
-  ahorros y Otros Ingresos, con búsqueda/filtros y top categorías de
-  gasto), y **Balance Mensual** — **con escritura**: mueve el selector de
-  mes de la hoja 'Balance Mensual' (mismo protocolo write-then-read que
-  Presupuesto) y lee sus 4 métricas + 3 tablas ya calculadas por las
-  fórmulas de la hoja, con el toggle Efectivo real (mes en que se paga) /
-  Consumo (mes en que se compra, recalculado del lado del cliente por
-  `Fecha Compra`).
+- 📊 Análisis — **completo** (6 sub-tabs, con escritura en Balance Mensual):
+  **Categorías** (gasto real histórico por categoría, gráfico + tabla),
+  **Esenciales / No Esenciales** (gasto de consumo real en pesos
+  clasificado con `clasificar_esencial()` — la hoja 'Categorías Esenciales'
+  tiene prioridad sobre la clasificación por defecto —, con gráfico de
+  torta, detalle por categoría y aviso de categorías sin clasificar
+  todavía), **Evolución** (tendencia mes a mes de las 5 métricas de
+  'Resumen Mensual' — Ingresos ganados/Gastos personales/Deudas y
+  obligaciones/Ahorro e inversiones/Disponible del mes —, filtro de año,
+  gráfico de líneas y tabla), **Año vs. Año** (compara el mismo mes entre
+  distintos años elegidos a mano, con selector de métrica y tabla de
+  totales + variación % año contra año), **Movimientos** (vista unificada
+  devengado de las 7 fuentes: colillas devengo/descuento, Visa, Mastercard
+  COP/USD, Cuenta de ahorros y Otros Ingresos, con búsqueda/filtros y top
+  categorías de gasto), y **Balance Mensual** — **con escritura**: mueve el
+  selector de mes de la hoja 'Balance Mensual' (mismo protocolo
+  write-then-read que Presupuesto) y lee sus 4 métricas + 3 tablas ya
+  calculadas por las fórmulas de la hoja, con el toggle Efectivo real (mes
+  en que se paga) / Consumo (mes en que se compra, recalculado del lado
+  del cliente por `Fecha Compra`).
 - 🏢 Estados Financieros — **completo, con escritura**: sub-tabs Estado de
   Resultados (Ingresos − Gastos operativos = Utilidad Neta, con desglose
   por categoría de ambos lados, mismo selector Total histórico/Un año/Un
@@ -133,25 +141,19 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   últimos 3 con gasto > 0, redondeado al millar más cercano).
 
 ⏳ Todavía no portado (usá la versión de Streamlit mientras tanto):
-- El gráfico de "Tendencia de los últimos meses" al pie de Resumen — lee el
-  encabezado de una hoja formulada dinámicamente (`Resumen Mensual`) y
-  requiere confirmar el orden real de columnas contra el Sheet antes de
-  portarlo, para no arriesgar mostrar un número financiero mal cruzado
 - Dentro de Inversiones: importar portafolios, agregar un dividendo/interés
   manual y editar el historial de operaciones importado del broker (son
   formularios de escritura sobre el historial, no dependen de Yahoo
   Finance — patrimonio unificado, actualizar precios y Crecimiento y
-  Rentabilidad ya están portados, ver más abajo)
-- Dentro de Análisis: Evolución y Año vs. Año — ambas leen dinámicamente el
-  encabezado de la hoja 'Resumen Mensual' (formulada, sin un layout fijo
-  en código); requieren confirmar el orden real de columnas contra el
-  Sheet antes de portarlas (Esenciales/No Esenciales y Balance Mensual ya
-  están portados)
-- Las tres piezas de arriba están bloqueadas por lo mismo: leer
-  dinámicamente el encabezado de una hoja formulada sin un layout fijo en
-  el código Python (`Resumen Mensual`), donde no vale la pena adivinar con
-  datos financieros. Todo lo demás de la app, incluyendo lo que dependía
-  de Yahoo Finance, ya está portado.
+  Rentabilidad ya están portados, ver más abajo).
+
+Todo lo demás de la app, incluyendo el gráfico de "Tendencia de los últimos
+meses" de Resumen y Evolución/Año vs. Año de Análisis (las tres leen la hoja
+'Resumen Mensual' — se confirmó el orden real de columnas contra el Sheet
+antes de portarlas: `Mes | Ingresos ganados | Gastos personales | Deudas y
+obligaciones | Ahorro e inversiones | Disponible del mes`) y lo que dependía
+de Yahoo Finance, ya está portado. Solo quedan formularios de escritura
+puntuales dentro de Inversiones.
 
 ## Actualizar precios de mercado (Yahoo Finance)
 

@@ -1,17 +1,26 @@
 // Puerto de render_resumen() (app_presupuesto.py) — la parte de cálculo
 // (_ingresos_gastos_periodo, categorización de gasto + cruce de
 // Inversiones contra plataforma) vive en js/ingresos-gastos.js, compartida
-// con 🏢 Estados Financieros → Estado de Resultados.
-//
-// TODAVÍA NO portado: el gráfico de "Tendencia de los últimos meses" al pie
-// de Resumen (usa Resumen Mensual, vista efectivo real — página aparte).
+// con 🏢 Estados Financieros → Estado de Resultados. El gráfico de
+// "Tendencia de los últimos meses" (vista efectivo real) lee la hoja
+// 'Resumen Mensual' -- puerto de read_resumen_mensual() (sheets_backend.py),
+// confirmado el orden real de columnas contra el Sheet.
 
 const PaginaResumen = (() => {
+  // Puerto del encabezado real de 'Resumen Mensual'!B5:G30 (fila 5).
+  const RESUMEN_MENSUAL_COLS = [
+    "Mes", "IngresosGanados", "GastosPersonales", "DeudasObligaciones", "AhorroInversiones", "DisponibleMes",
+  ];
   let datosCache = null;
+  let chartTendencia = null;
 
   async function cargarDatos() {
     if (datosCache) return datosCache;
-    datosCache = await IngresosGastosPeriodo.cargarDatosBase();
+    const [base, rawMensual] = await Promise.all([
+      IngresosGastosPeriodo.cargarDatosBase(),
+      SheetsApi.batchGet(["resumen_mensual"]),
+    ]);
+    datosCache = { ...base, resumenMensual: filasAObjetos(rawMensual.resumen_mensual, RESUMEN_MENSUAL_COLS) };
     return datosCache;
   }
 
@@ -163,10 +172,13 @@ const PaginaResumen = (() => {
             ${metric("Portafolio en dólares", "US$ " + portafolioDolares.toLocaleString("en-US", { minimumFractionDigits: 2 }))}
           </div>
 
-          <div class="aviso">⚠️ El gráfico de "Tendencia de los últimos meses" todavía no está portado —
-          usá <a href="https://presupuesto-app-jmr.streamlit.app" target="_blank" rel="noopener">la versión
-          de Streamlit</a> para eso mientras tanto.</div>
+          <hr>
+          <h4>📊 Tendencia de los últimos meses</h4>
+          <p class="caption">Vista <strong>efectivo real</strong> (igual que Balance Mensual/Evolución): ingresos,
+          gastos y lo que quedó disponible cada mes, para los meses que ya tienen datos cargados.</p>
+          <div id="resumen-tendencia"></div>
         `;
+        renderTendencia(contenido.querySelector("#resumen-tendencia"), datos.resumenMensual);
       } catch (err) {
         contenido.innerHTML = `<div class="error">Error cargando el Sheet: ${err.message}</div>`;
         console.error(err);
@@ -174,6 +186,30 @@ const PaginaResumen = (() => {
     }
 
     renderContenido();
+  }
+
+  // Puerto del bloque "Tendencia de los últimos meses" dentro de render_resumen().
+  function renderTendencia(div, resumenMensual) {
+    const filas = resumenMensual.filter((f) => toNumber(f.IngresosGanados) !== 0).slice(-12);
+    if (!filas.length) {
+      div.innerHTML = "<p>Todavía no hay suficientes meses cargados para ver la tendencia.</p>";
+      return;
+    }
+    div.innerHTML = `<canvas id="chart_tendencia_resumen" height="160"></canvas>`;
+    if (chartTendencia) chartTendencia.destroy();
+    const conceptos = [
+      { col: "IngresosGanados", label: "Ingresos ganados", color: "#4573d6" },
+      { col: "GastosPersonales", label: "Gastos personales", color: "#d64545" },
+      { col: "DisponibleMes", label: "Disponible del mes", color: "#45a06a" },
+    ];
+    chartTendencia = new Chart(div.querySelector("#chart_tendencia_resumen").getContext("2d"), {
+      type: "bar",
+      data: {
+        labels: filas.map((f) => f.Mes),
+        datasets: conceptos.map((c) => ({ label: c.label, data: filas.map((f) => toNumber(f[c.col])), backgroundColor: c.color })),
+      },
+      options: { responsive: true, scales: { x: { type: "category" }, y: { ticks: { callback: (v) => fmtMoneda(v) } } } },
+    });
   }
 
   function metric(label, value) {

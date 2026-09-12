@@ -60,4 +60,9 @@ const RANGOS = {
   // PaginaInversiones.cargarDatos() (js/pages/inversiones.js).
   datos_mercado: "'Datos de Mercado (Auto)'!A1:B10",
   historial_valor_cartera: "'Historial de Valor de Cartera'!A2:E5000",
+  // Puerto de ranges["resumen_mensual"] (sheets_backend.py) -- B5:G30, fila 5
+  // es el encabezado real de la hoja (confirmado leyendo el Sheet real:
+  // Mes | Ingresos ganados | Gastos personales | Deudas y obligaciones |
+  // Ahorro e inversiones | Disponible del mes).
+  resumen_mensual: "'Resumen Mensual'!B5:G30",
 };

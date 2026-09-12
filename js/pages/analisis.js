@@ -1,18 +1,25 @@
-// Puerto (parcial, solo lectura) de render_analisis() (app_presupuesto.py):
-// Categorías, Movimientos, Esenciales/No Esenciales y Balance Mensual (esta
-// última con escritura — mueve el selector de mes en la hoja 'Balance
-// Mensual' del Sheet, mismo protocolo que Presupuesto).
-//
-// TODAVÍA NO portado: Evolución y Año vs. Año — ambas leen dinámicamente el
-// encabezado de la hoja 'Resumen Mensual' (formulada, sin un layout fijo en
-// código) y requieren confirmar el orden real de columnas contra el Sheet
-// antes de portarlas, para no arriesgar cruzar mal un número financiero.
+// Puerto (solo lectura, salvo Balance Mensual) de render_analisis()
+// (app_presupuesto.py): Categorías, Esenciales/No Esenciales, Evolución, Año
+// vs. Año, Movimientos y Balance Mensual (esta última con escritura — mueve
+// el selector de mes en la hoja 'Balance Mensual' del Sheet, mismo protocolo
+// que Presupuesto). Evolución y Año vs. Año leen 'Resumen Mensual' -- puerto
+// de read_resumen_mensual() (sheets_backend.py), confirmado el orden real de
+// columnas contra el Sheet (ver RESUMEN_MENSUAL_COLS).
 
 const PaginaAnalisis = (() => {
   const EGRESO_COLS = [
     "PeriodoExtracto", "FechaCompra", "Comercio", "Moneda", "Cuotas", "ValorTotal",
     "ValorCargado", "SaldoPendiente", "Categoria", "Reembolsable", "Notas",
   ];
+  // Puerto del encabezado real de 'Resumen Mensual'!B5:G30 (fila 5).
+  const RESUMEN_MENSUAL_COLS = [
+    "Mes", "IngresosGanados", "GastosPersonales", "DeudasObligaciones", "AhorroInversiones", "DisponibleMes",
+  ];
+  const RESUMEN_MENSUAL_LABELS = {
+    IngresosGanados: "Ingresos ganados", GastosPersonales: "Gastos personales",
+    DeudasObligaciones: "Deudas y obligaciones", AhorroInversiones: "Ahorro e inversiones",
+    DisponibleMes: "Disponible del mes",
+  };
   // Puerto de CATEGORIAS_ESENCIALES/CATEGORIAS_NO_ESENCIALES/CATEGORIAS_NO_CONSUMO
   // y clasificar_esencial() (cuenta_formatos.py).
   const CATEGORIAS_ESENCIALES = new Set([
@@ -34,6 +41,8 @@ const PaginaAnalisis = (() => {
   let chartCategorias = null;
   let chartTopCategorias = null;
   let chartEsenciales = null;
+  let chartEvolucion = null;
+  let chartAnioVsAnio = null;
   let mesBalanceAplicado = null;
 
   function render(container) {
@@ -43,13 +52,12 @@ const PaginaAnalisis = (() => {
       <div class="tabs" id="tabs-analisis">
         <button class="tab-btn activo" data-tab="categorias">Categorías</button>
         <button class="tab-btn" data-tab="esenciales">Esenciales / No Esenciales</button>
+        <button class="tab-btn" data-tab="evolucion">Evolución</button>
+        <button class="tab-btn" data-tab="anio_vs_anio">Año vs. Año</button>
         <button class="tab-btn" data-tab="movimientos">Movimientos</button>
         <button class="tab-btn" data-tab="balance">Balance Mensual</button>
       </div>
       <div id="panel-analisis">Cargando datos del Sheet…</div>
-      <div class="aviso">⚠️ Todavía no portadas: Evolución y Año vs. Año — usá
-      <a href="https://presupuesto-app-jmr.streamlit.app" target="_blank" rel="noopener">la
-      versión de Streamlit</a> para eso mientras tanto.</div>
     `;
     const tabsDiv = container.querySelector("#tabs-analisis");
     const panel = container.querySelector("#panel-analisis");
@@ -68,6 +76,8 @@ const PaginaAnalisis = (() => {
       try {
         if (activo === "categorias") await renderCategorias(panel);
         else if (activo === "esenciales") await renderEsenciales(panel);
+        else if (activo === "evolucion") await renderEvolucion(panel);
+        else if (activo === "anio_vs_anio") await renderAnioVsAnio(panel);
         else if (activo === "movimientos") await renderMovimientos(panel);
         else await renderBalanceMensual(panel);
       } catch (err) {
@@ -77,6 +87,139 @@ const PaginaAnalisis = (() => {
     }
 
     renderTab();
+  }
+
+  // ---------------------------------------------------------------------
+  async function cargarResumenMensual() {
+    const raw = await SheetsApi.batchGet(["resumen_mensual"]);
+    return filasAObjetos(raw.resumen_mensual, RESUMEN_MENSUAL_COLS);
+  }
+
+  // Puerto de render_evolucion() (app_presupuesto.py).
+  async function renderEvolucion(panel) {
+    const dfMes = await cargarResumenMensual();
+    if (!dfMes.length) {
+      panel.innerHTML = "<p>Todavía no hay suficientes meses cargados para la evolución mensual.</p>";
+      return;
+    }
+    const anios = [...new Set(dfMes.map((f) => f.Mes.slice(0, 4)).filter((y) => /^\d{4}$/.test(y)))].sort((a, b) => b - a);
+    panel.innerHTML = `
+      <h4>Evolución mensual</h4>
+      <p class="caption">Vista <strong>efectivo real</strong>: el gasto de tarjeta de cada mes es el que
+      efectivamente se pagó ese mes (no el de las compras hechas ese mes) — Visa/Mastercard se cuentan un mes
+      después de la fecha de corte, cuando se paga. Efectivo ya sale en su propio mes.</p>
+      <select id="ev_anio"></select>
+      <canvas id="ev_chart" height="200"></canvas>
+      <details><summary>Ver tabla</summary>
+        <div class="tabla-scroll"><table class="tabla" id="ev_tabla"></table></div>
+      </details>
+    `;
+    const anioSel = panel.querySelector("#ev_anio");
+    anioSel.add(new Option("(todos)", "(todos)"));
+    anios.forEach((a) => anioSel.add(new Option(a, a)));
+
+    const cols = RESUMEN_MENSUAL_COLS.slice(1);
+    function actualizar() {
+      const f = anioSel.value === "(todos)" ? dfMes : dfMes.filter((x) => x.Mes.startsWith(anioSel.value));
+      if (chartEvolucion) chartEvolucion.destroy();
+      chartEvolucion = new Chart(panel.querySelector("#ev_chart").getContext("2d"), {
+        type: "line",
+        data: {
+          labels: f.map((x) => x.Mes),
+          datasets: cols.map((c, i) => ({
+            label: RESUMEN_MENSUAL_LABELS[c], data: f.map((x) => toNumber(x[c])),
+            borderColor: PALETA[i % PALETA.length], backgroundColor: PALETA[i % PALETA.length],
+            fill: false, tension: 0.1,
+          })),
+        },
+        options: { responsive: true, scales: { x: { type: "category" }, y: { ticks: { callback: (v) => fmtMoneda(v) } } } },
+      });
+      panel.querySelector("#ev_tabla").innerHTML = `
+        <thead><tr><th>Mes</th>${cols.map((c) => `<th>${RESUMEN_MENSUAL_LABELS[c]}</th>`).join("")}</tr></thead>
+        <tbody>${f.map((x) => `<tr><td>${x.Mes}</td>${cols.map((c) => `<td>${fmtMoneda(toNumber(x[c]))}</td>`).join("")}</tr>`).join("")}</tbody>
+      `;
+    }
+    anioSel.addEventListener("change", actualizar);
+    actualizar();
+  }
+
+  // Puerto de render_anio_vs_anio() (app_presupuesto.py).
+  async function renderAnioVsAnio(panel) {
+    const dfMesTodo = await cargarResumenMensual();
+    const hoyStr = new Date().toISOString().slice(0, 7);
+    const dfMes = dfMesTodo.filter((f) => f.Mes <= hoyStr).map((f) => ({
+      ...f, _anio: parseInt(f.Mes.slice(0, 4), 10), _mesNum: parseInt(f.Mes.slice(5, 7), 10),
+    }));
+    if (!dfMes.length) {
+      panel.innerHTML = "<p>Todavía no hay suficientes meses cargados para comparar años.</p>";
+      return;
+    }
+    const cols = RESUMEN_MENSUAL_COLS.slice(1);
+    const aniosDisp = [...new Set(dfMes.map((f) => f._anio))].sort((a, b) => a - b);
+    const aniosDefault = new Set(aniosDisp.length >= 2 ? aniosDisp.slice(-2) : aniosDisp);
+
+    panel.innerHTML = `
+      <h4>Año vs. Año</h4>
+      <p class="caption">Vista <strong>efectivo real</strong> (igual que Evolución): compará el mismo mes entre
+      distintos años para ver si vas mejor o peor que antes, no solo si vas mejor o peor que el mes pasado.</p>
+      <select id="av_metrica"></select>
+      <div id="av_anios">${aniosDisp.map((a) => `
+        <label class="checkbox-row"><input type="checkbox" value="${a}" ${aniosDefault.has(a) ? "checked" : ""}> ${a}</label>
+      `).join("")}</div>
+      <div id="av_contenido"></div>
+    `;
+    const metricaSel = panel.querySelector("#av_metrica");
+    cols.forEach((c) => metricaSel.add(new Option(RESUMEN_MENSUAL_LABELS[c], c)));
+    const anioChecks = [...panel.querySelectorAll("#av_anios input")];
+
+    function actualizar() {
+      const contenido = panel.querySelector("#av_contenido");
+      const metrica = metricaSel.value;
+      const aniosSel = anioChecks.filter((c) => c.checked).map((c) => Number(c.value));
+      if (!aniosSel.length) {
+        contenido.innerHTML = "<p>Elegí al menos un año.</p>";
+        if (chartAnioVsAnio) { chartAnioVsAnio.destroy(); chartAnioVsAnio = null; }
+        return;
+      }
+      const f = dfMes.filter((x) => aniosSel.includes(x._anio));
+      contenido.innerHTML = `<canvas id="av_chart" height="220"></canvas><div class="tabla-scroll"><table class="tabla" id="av_tabla"></table></div>
+        <p class="caption">La variación compara cada año contra el anterior de esta misma tabla (no
+        necesariamente el año calendario inmediatamente anterior, si no elegiste años consecutivos).</p>`;
+
+      const aniosOrdenados = [...aniosSel].sort((a, b) => a - b);
+      if (chartAnioVsAnio) chartAnioVsAnio.destroy();
+      chartAnioVsAnio = new Chart(contenido.querySelector("#av_chart").getContext("2d"), {
+        type: "bar",
+        data: {
+          labels: Object.values(MESES_NOMBRE),
+          datasets: aniosOrdenados.map((a, i) => ({
+            label: String(a),
+            data: Object.keys(MESES_NOMBRE).map((m) => {
+              const fila = f.find((x) => x._anio === a && x._mesNum === Number(m));
+              return fila ? toNumber(fila[metrica]) : null;
+            }),
+            backgroundColor: PALETA[i % PALETA.length],
+          })),
+        },
+        options: { responsive: true, plugins: { title: { display: true, text: RESUMEN_MENSUAL_LABELS[metrica] } },
+          scales: { y: { ticks: { callback: (v) => fmtMoneda(v) } } } },
+      });
+
+      let anterior = null;
+      const filasTot = aniosOrdenados.map((a) => {
+        const total = f.filter((x) => x._anio === a).reduce((s, x) => s + toNumber(x[metrica]), 0);
+        const variacion = anterior !== null ? `${((total - anterior) / Math.abs(anterior) * 100).toFixed(0)}%` : "-";
+        anterior = total;
+        return { anio: a, total, variacion };
+      });
+      contenido.querySelector("#av_tabla").innerHTML = `
+        <thead><tr><th>Año</th><th>Total ${RESUMEN_MENSUAL_LABELS[metrica]}</th><th>Variación</th></tr></thead>
+        <tbody>${filasTot.map((r) => `<tr><td>${r.anio}</td><td>${fmtMoneda(r.total)}</td><td>${r.variacion}</td></tr>`).join("")}</tbody>
+      `;
+    }
+    metricaSel.addEventListener("change", actualizar);
+    anioChecks.forEach((c) => c.addEventListener("change", actualizar));
+    actualizar();
   }
 
   // ---------------------------------------------------------------------
