@@ -40,8 +40,8 @@ def main():
     gc = gspread.authorize(creds)
     ws = gc.open_by_key(SHEET_ID).worksheet(SHEET_PESOS)
 
-    filas = ws.get(f"A{PRIMERA_FILA}:H{ULTIMA_FILA}", value_render_option="UNFORMATTED_VALUE")
-    filas = [(list(r) + [None] * 8)[:8] for r in filas]
+    filas_raw = ws.get(f"A{PRIMERA_FILA}:H{ULTIMA_FILA}", value_render_option="UNFORMATTED_VALUE")
+    filas = [(list(r) + [None] * 8)[:8] for r in filas_raw]
 
     fila_existente = next((i for i, r in enumerate(filas) if str(r[0] or "").strip() == TICKER), None)
     if fila_existente is not None:
@@ -50,10 +50,14 @@ def main():
         print(f"Ya existía en la fila {fila_num} -- actualicé Precio Actual a {PRECIO_ACTUAL}.")
         return
 
-    fila_libre = next((i for i, r in enumerate(filas) if not str(r[0] or "").strip()), None)
-    if fila_libre is None:
-        raise RuntimeError(f"No hay fila libre entre {PRIMERA_FILA} y {ULTIMA_FILA}.")
+    # gspread recorta las filas vacías al final del rango pedido -- si
+    # "filas" salió más corta que el bloque completo, la primera fila libre
+    # real es la siguiente a la última que sí volvió (nunca hay un hueco
+    # vacío en el medio, siempre se carga de arriba hacia abajo).
+    fila_libre = next((i for i, r in enumerate(filas) if not str(r[0] or "").strip()), len(filas))
     fila_num = PRIMERA_FILA + fila_libre
+    if fila_num > ULTIMA_FILA:
+        raise RuntimeError(f"No hay fila libre entre {PRIMERA_FILA} y {ULTIMA_FILA}.")
     ws.update(f"A{fila_num}:D{fila_num}", [[TICKER, TIPO, CANTIDAD, PRECIO_COMPRA]], value_input_option="USER_ENTERED")
     ws.update(f"F{fila_num}", [[PRECIO_ACTUAL]], value_input_option="USER_ENTERED")
     print(f"Agregado en la fila {fila_num}: {TICKER} | {TIPO} | Precio Actual {PRECIO_ACTUAL}.")
