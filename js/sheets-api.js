@@ -30,8 +30,11 @@ const SheetsApi = (() => {
   // Sobrescribe un rango completo (p. ej. "'Declaraciones de Renta'!A2:J12")
   // con 'values' (array de arrays, mismo orden de columnas que el rango).
   // Requiere el scope de escritura completo de Sheets (no el .readonly).
-  async function updateRange(range, values) {
-    const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`;
+  // valueInputOption "RAW" evita que Sheets reinterprete el texto (p. ej.
+  // "2026-08" como fecha) — usalo cuando el original en Python también usa
+  // RAW en vez de USER_ENTERED.
+  async function updateRange(range, values, valueInputOption = "USER_ENTERED") {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}/values/${encodeURIComponent(range)}?valueInputOption=${valueInputOption}`;
     const res = await fetch(url, {
       method: "PUT",
       headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
@@ -44,5 +47,21 @@ const SheetsApi = (() => {
     return res.json();
   }
 
-  return { batchGet, updateRange };
+  // Escribe varias celdas/rangos sueltos de una sola vez (p. ej. varias
+  // filas no contiguas de una columna) — 'updates' es [{range, values}].
+  async function batchUpdateRanges(updates, valueInputOption = "USER_ENTERED") {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}/values:batchUpdate`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ valueInputOption, data: updates }),
+    });
+    if (!res.ok) {
+      const texto = await res.text();
+      throw new Error(`Error ${res.status} escribiendo en el Sheet: ${texto}`);
+    }
+    return res.json();
+  }
+
+  return { batchGet, updateRange, batchUpdateRanges };
 })();

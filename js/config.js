@@ -38,6 +38,7 @@ const RANGOS = {
   declaraciones_renta: "'Declaraciones de Renta'!A2:J1000",
   resumen_categorias: "'Resumen'!B22:E39",
   conciliacion_efectivo: "'Balance Mensual'!A66:D265",
+  presupuesto: "'Presupuesto'!A5:E63",
   resumen_kpis: "'Resumen'!B5:E18",
   mc_detalle_usd: "'Egresos - Mastercard 5922'!A5698:K6697",
 };

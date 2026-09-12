@@ -4,7 +4,7 @@
 const PAGINAS = {
   "🏠 Resumen": { modulo: () => PaginaResumen, disponible: true },
   "📊 Análisis": { modulo: () => PaginaAnalisis, disponible: true },
-  "📋 Presupuesto": { disponible: false },
+  "📋 Presupuesto": { modulo: () => PaginaPresupuesto, disponible: true },
   "🏦 Deudas": { modulo: () => PaginaDeudas, disponible: true },
   "📈 Inversiones": { modulo: () => PaginaInversiones, disponible: true },
   "🏢 Estados Financieros": { modulo: () => PaginaEstadosFinancieros, disponible: true },
