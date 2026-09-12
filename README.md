@@ -55,6 +55,11 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   gráfico + tabla) y **Movimientos** (vista unificada devengado de las 7
   fuentes: colillas devengo/descuento, Visa, Mastercard COP/USD, Cuenta de
   ahorros y Otros Ingresos, con búsqueda/filtros y top categorías de gasto).
+- 🏢 Estados Financieros — sub-tabs **Estado de Resultados** (Ingresos −
+  Gastos operativos = Utilidad Neta, con desglose por categoría de ambos
+  lados, mismo selector Total histórico/Un año/Un mes que Resumen — ahora
+  comparten la lógica de cálculo vía `js/ingresos-gastos.js`) y **Balance
+  General** (Activos − Pasivos = Patrimonio Neto, foto de hoy).
 
 ⏳ Todavía no portado (usá la versión de Streamlit mientras tanto):
 - El gráfico de "Tendencia de los últimos meses" al pie de Resumen
@@ -68,7 +73,10 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
 - Dentro de Facturación Electrónica: agregar una factura a mano (escritura)
 - Dentro de Análisis: Esenciales/No Esenciales, Evolución, Año vs. Año y
   Balance Mensual (esta última también necesita escritura)
-- 📋 Presupuesto, 🏢 Estados Financieros
+- Dentro de Estados Financieros: Flujo de Efectivo y Auditoría Anual
+  (necesitan la lógica de deduplicación por Notas que separa
+  Financiación/Conciliación del resto de movimientos "no presupuestar")
+- 📋 Presupuesto
 - El resto de las secciones sigue siendo de solo lectura (agregar/editar/
   borrar) — Declaraciones de Renta es la única con escritura por ahora
 
@@ -134,6 +142,8 @@ js/util.js           — funciones puras portadas de Python (toNumber, fmtMoneda
 js/auth.js           — login/logout con Google Identity Services
 js/sheets-api.js      — wrapper sobre la API REST de Google Sheets (lectura y escritura)
 js/drive-api.js       — wrapper sobre la API REST de Google Drive (subir un PDF)
+js/ingresos-gastos.js — puerto de _ingresos_gastos_periodo(), compartido entre
+                         Resumen y Estados Financieros → Estado de Resultados
 js/app.js            — nav lateral y bootstrap
 js/pages/*.js        — una página por sección, cada una expone render(container)
 ```
