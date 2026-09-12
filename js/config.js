@@ -30,6 +30,8 @@ const RANGOS = {
   aportes_inversion_dolares: "'Inversiones - Dólares'!A79:D1000",
   deudas: "'Deudas - Resumen'!A5:H10",
   deuda_tarjeta_usd: "'Deudas - Resumen'!A12:C12",
+  posiciones_pesos: "'Inversiones - Pesos'!A5:H45",
+  posiciones_dolares: "'Inversiones - Dólares'!A5:H45",
   resumen_kpis: "'Resumen'!B5:E18",
   mc_detalle_usd: "'Egresos - Mastercard 5922'!A5698:K6697",
 };

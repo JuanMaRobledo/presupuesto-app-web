@@ -30,6 +30,10 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
 - 🏦 Deudas — tarjetas de saldo total/cuota mensual, deuda de Mastercard en
   dólares aparte, torta de participación por entidad, tabla completa y
   gráfico de cuota mensual por entidad.
+- 📈 Inversiones — aportes/retiros en pesos y dólares (métricas + tabla),
+  depósitos y retiros por plataforma, capital neto transferido en el
+  tiempo, y posiciones (cantidad, precio, valor de mercado,
+  ganancia/pérdida) de cada moneda.
 
 ⏳ Todavía no portado (usá la versión de Streamlit mientras tanto):
 - El gráfico de "Tendencia de los últimos meses" al pie de Resumen
@@ -37,7 +41,9 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   escritura), "ver un extracto puntual" (cupo/saldo/pago de un corte), y
   el detalle de compras en USD de Mastercard
 - Dentro de Deudas: el formulario "Actualizar deudas manualmente" (escritura)
-- 📊 Análisis, 📋 Presupuesto, 📈 Inversiones (detalle),
+- Dentro de Inversiones: patrimonio unificado, actualizar precios (Yahoo
+  Finance), historial de operaciones del broker, Crecimiento y Rentabilidad
+- 📊 Análisis, 📋 Presupuesto,
   🏢 Estados Financieros, 💰 Ingresos, 🧾 Facturación Electrónica,
   📑 Declaraciones de Renta
 - Cualquier operación de **escritura** (agregar/editar/borrar) — esta primera

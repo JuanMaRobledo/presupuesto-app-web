@@ -6,7 +6,7 @@ const PAGINAS = {
   "📊 Análisis": { disponible: false },
   "📋 Presupuesto": { disponible: false },
   "🏦 Deudas": { modulo: () => PaginaDeudas, disponible: true },
-  "📈 Inversiones": { disponible: false },
+  "📈 Inversiones": { modulo: () => PaginaInversiones, disponible: true },
   "🏢 Estados Financieros": { disponible: false },
   "💰 Ingresos": { disponible: false },
   "💳 Egresos": { modulo: () => PaginaEgresos, disponible: true },
