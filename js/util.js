@@ -50,12 +50,30 @@ function esNoPresupuestar(categoria) {
   return typeof categoria === "string" && categoria.trim().toLowerCase().endsWith(NO_PRESUPUESTAR_SUFIJO);
 }
 
+// Puerto de _serial_to_text() (sheets_backend.py) — Sheets guarda una fecha
+// "de verdad" (no texto) como número de serie (días desde 1899-12-30); la
+// API con UNFORMATTED_VALUE entrega ese número tal cual, así que hay que
+// reconvertirlo a 'dd/mm/yyyy' — si no, cualquier filtro por año/mes sobre
+// esa columna queda roto en silencio. Si 'v' ya es texto, lo deja igual.
+function serialToText(v) {
+  if (typeof v === "number") {
+    const epochUTC = Date.UTC(1899, 11, 30);
+    const d = new Date(epochUTC + v * 86400000);
+    const dd = String(d.getUTCDate()).padStart(2, "0");
+    const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+    const yyyy = d.getUTCFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }
+  return v;
+}
+
 // Puerto de _extraer_anio_mes() (app_presupuesto.py) — de un 'Periodo' o
 // 'Fecha' saca [año, mes]; [null, null] si el formato no matchea ninguno de
 // los patrones conocidos (dd/mm/yyyy, yyyy-mm-dd, yyyy-mm, "1a quincena jul-2026").
+// Acepta también un número de serie de Sheets directo (lo reconvierte solo).
 function extraerAnioMes(periodo) {
-  if (!periodo) return [null, null];
-  const s = String(periodo);
+  if (!periodo && periodo !== 0) return [null, null];
+  const s = String(typeof periodo === "number" ? serialToText(periodo) : periodo);
   let m = s.match(/^\d{1,2}\/(\d{1,2})\/(\d{4})$/);
   if (m) return [parseInt(m[2], 10), parseInt(m[1], 10)];
   m = s.match(/^(\d{4})-(\d{1,2})-\d{1,2}$/);
@@ -74,8 +92,8 @@ function extraerAnioMes(periodo) {
 // de comparación de fechas, equivalente a pd.to_datetime(..., dayfirst=True)
 // .date() del lado de Python). null si el formato no matchea.
 function parseFechaISO(s) {
-  if (!s) return null;
-  const str = String(s).trim();
+  if (!s && s !== 0) return null;
+  const str = String(typeof s === "number" ? serialToText(s) : s).trim();
   let m = str.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (m) return `${m[1]}-${m[2].padStart(2, "0")}-${m[3].padStart(2, "0")}`;
   m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
@@ -99,8 +117,8 @@ function shiftMes(mesStr, delta) {
 // timestamp comparable, para poder ordenar movimientos de fuentes distintas
 // de forma estable sin inventar una fecha de pago exacta para las colillas.
 function periodoSortValue(value) {
-  if (!value) return -8640000000000000;
-  const texto = String(value).trim().toLowerCase();
+  if (!value && value !== 0) return -8640000000000000;
+  const texto = String(typeof value === "number" ? serialToText(value) : value).trim().toLowerCase();
   let m = texto.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (m) return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])).getTime();
   m = texto.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
@@ -117,13 +135,18 @@ function periodoSortValue(value) {
 
 // Convierte las filas crudas de un rango (array de arrays) en objetos, según
 // una lista de nombres de columna en el mismo orden que llegan de la API.
-function filasAObjetos(filas, columnas) {
+// 'columnasFecha' (opcional): nombres de columnas que son fecha "de verdad"
+// en el Sheet — se les aplica serialToText(), igual que _serial_to_text()
+// del lado de Python en cada read_*() que toca una columna de fecha.
+function filasAObjetos(filas, columnas, columnasFecha = []) {
   return (filas || [])
     .filter((r) => r && r[0] !== undefined && r[0] !== null && r[0] !== "")
     .map((r) => {
       const obj = {};
       columnas.forEach((nombre, i) => {
-        obj[nombre] = r[i] !== undefined ? r[i] : null;
+        let v = r[i] !== undefined ? r[i] : null;
+        if (columnasFecha.includes(nombre)) v = serialToText(v);
+        obj[nombre] = v;
       });
       return obj;
     });

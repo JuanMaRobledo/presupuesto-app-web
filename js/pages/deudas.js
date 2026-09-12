@@ -16,7 +16,7 @@ const PaginaDeudas = (() => {
   async function cargarDatos() {
     const raw = await SheetsApi.batchGet(["deudas", "deuda_tarjeta_usd"]);
     return {
-      deudas: filasAObjetos(raw.deudas, DEUDA_COLS),
+      deudas: filasAObjetos(raw.deudas, DEUDA_COLS, ["FechaEstPago"]),
       deudaUsd: (raw.deuda_tarjeta_usd || [])[0] || null,
     };
   }

@@ -36,14 +36,19 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   depósitos y retiros por plataforma, capital neto transferido en el
   tiempo, y posiciones (cantidad, precio, valor de mercado,
   ganancia/pérdida) de cada moneda.
-- 💰 Ingresos — sub-tabs Colillas de Pago (resumen histórico, tendencia por
-  quincena, y el detalle devengos/descuentos tanto general como filtrado a
-  un mes puntual, quincena por quincena) y Otros Ingresos (búsqueda,
-  filtros, "ocultar no presupuestar", agrupamiento de Rendimientos
-  Financieros por mes, total por categoría y gráfico).
-- 🧾 Facturación Electrónica — registro año a año, con resumen por año,
-  búsqueda por emisor, filtros de año/mes, y el link "Correo" al mail
-  original en Gmail para las facturas de la carga histórica.
+- 💰 Ingresos — sub-tabs Colillas de Pago (solo lectura: resumen histórico,
+  tendencia por quincena, y el detalle devengos/descuentos tanto general
+  como filtrado a un mes puntual, quincena por quincena) y Otros Ingresos —
+  **con escritura**: búsqueda, filtros, "ocultar no presupuestar",
+  agrupamiento de Rendimientos Financieros por mes, total por categoría y
+  gráfico, más agregar un ingreso a mano y eliminar una fila puntual
+  (mismo match exacto Fecha/Concepto/Categoría/Valor que
+  `eliminar_otro_ingreso()`).
+- 🧾 Facturación Electrónica — **con escritura**: registro año a año, con
+  resumen por año, búsqueda por emisor, filtros de año/mes, el link
+  "Correo" al mail original en Gmail para las facturas de la carga
+  histórica, y un formulario para agregar una factura a mano (rechaza
+  duplicados por NIT Emisor + Número de Documento).
 - 📑 Declaraciones de Renta — **con escritura**: tabla + gráfico de
   Patrimonio Líquido/Impuesto a Cargo por año, y un formulario que sube el
   PDF directo a tu Google Drive (o aceptá pegar un link a mano) y guarda el
@@ -76,8 +81,9 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
 - Dentro de Deudas: el formulario "Actualizar deudas manualmente" (escritura)
 - Dentro de Inversiones: patrimonio unificado, actualizar precios (Yahoo
   Finance), historial de operaciones del broker, Crecimiento y Rentabilidad
-- Dentro de Ingresos: agregar/eliminar una colilla o un ingreso (escritura)
-- Dentro de Facturación Electrónica: agregar una factura a mano (escritura)
+- Dentro de Ingresos: agregar/eliminar una colilla (quincena) — es un
+  formulario más grande, con una tabla editable de devengos/descuentos
+  (agregar/eliminar un Otro Ingreso ya está portado)
 - Dentro de Análisis: Esenciales/No Esenciales, Evolución, Año vs. Año y
   Balance Mensual (esta última también necesita escritura)
 - Dentro de Estados Financieros: Flujo de Efectivo y Auditoría Anual

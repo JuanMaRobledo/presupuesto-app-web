@@ -14,7 +14,7 @@ const PaginaDeclaraciones = (() => {
 
   async function cargarDatos() {
     const raw = await SheetsApi.batchGet(["declaraciones_renta"]);
-    return filasAObjetos(raw.declaraciones_renta, COLS);
+    return filasAObjetos(raw.declaraciones_renta, COLS, ["FechaPresentacion"]);
   }
 
   async function render(container) {

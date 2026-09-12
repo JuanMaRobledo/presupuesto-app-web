@@ -19,8 +19,8 @@ const PaginaInversiones = (() => {
       "aportes_inversion_pesos", "aportes_inversion_dolares", "posiciones_pesos", "posiciones_dolares",
     ]);
     return {
-      aportesPesos: filasAObjetos(raw.aportes_inversion_pesos, APORTE_COLS),
-      aportesDolares: filasAObjetos(raw.aportes_inversion_dolares, APORTE_COLS),
+      aportesPesos: filasAObjetos(raw.aportes_inversion_pesos, APORTE_COLS, ["Fecha"]),
+      aportesDolares: filasAObjetos(raw.aportes_inversion_dolares, APORTE_COLS, ["Fecha"]),
       posicionesPesos: filasAObjetos(raw.posiciones_pesos, POSICION_COLS),
       posicionesDolares: filasAObjetos(raw.posiciones_dolares, POSICION_COLS),
     };

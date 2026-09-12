@@ -23,18 +23,18 @@ const IngresosGastosPeriodo = (() => {
     });
 
     return {
-      colillas: filasAObjetos(raw.colillas_resumen, ["FechaPago", "Periodo", "DevengosTotales", "DescuentosTotales"]),
+      colillas: filasAObjetos(raw.colillas_resumen, ["FechaPago", "Periodo", "DevengosTotales", "DescuentosTotales"], ["FechaPago"]),
       colillasDevengos: filasAObjetos(raw.colillas_devengos, ["Quincena", "Concepto", "Categoria", "Valor"]),
       colillasDescuentos: filasAObjetos(raw.colillas_descuentos, ["Quincena", "Concepto", "Categoria", "Valor"]),
-      otrosIngresos: filasAObjetos(raw.otros_ingresos, ["Fecha", "Concepto", "Categoria", "Valor", "Notas"]),
-      efectivoDetalle: filasAObjetos(raw.efectivo_detalle, egresoCols),
-      visaDetalle: filasAObjetos(raw.visa_detalle, egresoCols),
-      mcDetalle: filasAObjetos(raw.mc_detalle, egresoCols),
-      aportesPesos: filasAObjetos(raw.aportes_inversion_pesos, aporteCols),
-      aportesDolares: filasAObjetos(raw.aportes_inversion_dolares, aporteCols),
+      otrosIngresos: filasAObjetos(raw.otros_ingresos, ["Fecha", "Concepto", "Categoria", "Valor", "Notas"], ["Fecha"]),
+      efectivoDetalle: filasAObjetos(raw.efectivo_detalle, egresoCols, ["FechaCompra"]),
+      visaDetalle: filasAObjetos(raw.visa_detalle, egresoCols, ["FechaCompra"]),
+      mcDetalle: filasAObjetos(raw.mc_detalle, egresoCols, ["FechaCompra"]),
+      aportesPesos: filasAObjetos(raw.aportes_inversion_pesos, aporteCols, ["Fecha"]),
+      aportesDolares: filasAObjetos(raw.aportes_inversion_dolares, aporteCols, ["Fecha"]),
       deudas: filasAObjetos(raw.deudas, [
         "Entidad", "TipoCredito", "SaldoActual", "TasaEA", "CuotaMensual", "PctPagado", "MesesRestantes", "FechaEstPago",
-      ]),
+      ], ["FechaEstPago"]),
       kpis,
     };
   }

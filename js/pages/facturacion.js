@@ -1,9 +1,6 @@
-// Puerto (solo lectura) de render_facturacion_electronica()
-// (app_presupuesto.py): registro año a año de facturas/notas electrónicas
-// (DIAN), sin conciliación contra Egresos.
-//
-// TODAVÍA NO portado: el formulario "Agregar una factura electrónica
-// manualmente" al pie (escritura).
+// Puerto de render_facturacion_electronica() (app_presupuesto.py): registro
+// año a año de facturas/notas electrónicas (DIAN), sin conciliación contra
+// Egresos, más el formulario para agregar una factura a mano.
 
 const PaginaFacturacion = (() => {
   const COLS = ["Fecha", "NitEmisor", "Emisor", "NumeroDocumento", "TipoDocumento", "Valor", "RemitenteCorreo", "Notas"];
@@ -14,13 +11,20 @@ const PaginaFacturacion = (() => {
       <p class="caption">Registro de facturas y notas electrónicas (DIAN) recibidas por correo, año a año —
       no se concilia contra Egresos, es solo el archivo de los documentos.</p>
       <div id="fe-contenido">Cargando datos del Sheet…</div>
+      <div id="fe-form"></div>
     `;
+    renderForm(container.querySelector("#fe-form"), container);
+    await recargarTabla(container);
+  }
+
+  async function recargarTabla(container) {
     const contenido = container.querySelector("#fe-contenido");
+    contenido.innerHTML = "Cargando datos del Sheet…";
     try {
       const raw = await SheetsApi.batchGet(["facturacion_electronica"]);
-      const filasOriginal = filasAObjetos(raw.facturacion_electronica, COLS);
+      const filasOriginal = filasAObjetos(raw.facturacion_electronica, COLS, ["Fecha"]);
       if (!filasOriginal.length) {
-        contenido.innerHTML = "<p>Todavía no hay facturas electrónicas cargadas.</p>";
+        contenido.innerHTML = "<p>Todavía no hay facturas electrónicas cargadas. Agregá una abajo.</p>";
         return;
       }
 
@@ -102,6 +106,76 @@ const PaginaFacturacion = (() => {
       contenido.innerHTML = `<div class="error">Error cargando el Sheet: ${err.message}</div>`;
       console.error(err);
     }
+  }
+
+  function renderForm(formDiv, container) {
+    formDiv.innerHTML = `
+      <h4>➕ Agregar una factura electrónica manualmente</h4>
+      <form id="form_factura">
+        <div class="row">
+          <div><label>Fecha</label><br><input type="date" id="fac_fecha" required></div>
+          <div><label>Valor (dejalo en 0 si no lo sabés)</label><br><input type="number" id="fac_valor" min="0" step="1000" value="0"></div>
+        </div>
+        <div class="campo"><label>Emisor (razón social)</label><br><input type="text" id="fac_emisor" class="input-texto" required></div>
+        <div class="row">
+          <div><label>NIT Emisor</label><br><input type="text" id="fac_nit"></div>
+          <div><label>Número de Documento</label><br><input type="text" id="fac_numero" required></div>
+        </div>
+        <div class="campo"><label>Tipo de Documento</label><br>
+          <input type="text" id="fac_tipo" class="input-texto" value="Factura Electrónica de Venta"></div>
+        <div class="campo"><label>Notas (opcional)</label><br><input type="text" id="fac_notas" class="input-texto"></div>
+        <button type="submit" id="fac_guardar">💾 Guardar factura</button>
+      </form>
+      <div class="aviso" id="fac_msg" hidden></div>
+    `;
+    formDiv.querySelector("#fac_fecha").valueAsDate = new Date();
+
+    formDiv.querySelector("#form_factura").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const msg = formDiv.querySelector("#fac_msg");
+      const btn = formDiv.querySelector("#fac_guardar");
+      const g = (id) => formDiv.querySelector(id).value;
+      const emisor = g("#fac_emisor").trim();
+      const numero = g("#fac_numero").trim();
+      const nit = g("#fac_nit").trim();
+      if (!emisor || !numero) {
+        mostrarMsg(msg, "Emisor y Número de Documento son obligatorios.", true);
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = "Guardando…";
+      try {
+        const raw = await SheetsApi.batchGet(["facturacion_electronica"]);
+        const existentes = filasAObjetos(raw.facturacion_electronica, COLS, ["Fecha"]);
+        const yaExiste = existentes.some((f) => String(f.NitEmisor) === nit && String(f.NumeroDocumento) === numero);
+        if (yaExiste) {
+          mostrarMsg(msg, "Ya existía una factura con ese Emisor + Número de Documento — no se agregó de nuevo.", true);
+        } else {
+          const valor = Number(g("#fac_valor")) || 0;
+          await SheetsApi.appendRows(RANGOS.facturacion_electronica, [[
+            g("#fac_fecha"), nit, emisor, numero, g("#fac_tipo").trim(), valor > 0 ? valor : "", "", g("#fac_notas").trim(),
+          ]]);
+          mostrarMsg(msg, "Factura agregada.", false);
+          formDiv.querySelector("#form_factura").reset();
+          formDiv.querySelector("#fac_fecha").valueAsDate = new Date();
+          formDiv.querySelector("#fac_tipo").value = "Factura Electrónica de Venta";
+          await recargarTabla(container);
+        }
+      } catch (err) {
+        mostrarMsg(msg, `No pude guardar: ${err.message}`, true);
+        console.error(err);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "💾 Guardar factura";
+      }
+    });
+  }
+
+  function mostrarMsg(el, texto, esError) {
+    el.hidden = false;
+    el.textContent = texto;
+    el.style.background = esError ? "#f8d7da" : "#d1e7dd";
+    el.style.color = esError ? "#842029" : "#0f5132";
   }
 
   function metric(label, value) {

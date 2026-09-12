@@ -154,14 +154,14 @@ const PaginaEstadosFinancieros = (() => {
   // ---------------------------------------------------------------------
   async function renderBalanceGeneral(panel) {
     const raw = await SheetsApi.batchGet(["conciliacion_efectivo", "resumen_kpis", "deudas", "deuda_tarjeta_usd"]);
-    const conciliacion = filasAObjetos(raw.conciliacion_efectivo, ["Mes", "SaldoInicial", "SaldoFinal", "FechaRegistro"]);
+    const conciliacion = filasAObjetos(raw.conciliacion_efectivo, ["Mes", "SaldoInicial", "SaldoFinal", "FechaRegistro"], ["FechaRegistro"]);
     const kpis = {};
     (raw.resumen_kpis || []).forEach((row) => {
       if (row && row[0]) kpis[row[0]] = toNumber(row.length >= 4 ? row[3] : row[row.length - 1]);
     });
     const deudas = filasAObjetos(raw.deudas, [
       "Entidad", "TipoCredito", "SaldoActual", "TasaEA", "CuotaMensual", "PctPagado", "MesesRestantes", "FechaEstPago",
-    ]);
+    ], ["FechaEstPago"]);
     const deudaUsd = (raw.deuda_tarjeta_usd || [])[0] || null;
 
     let saldoEfectivo = 0, mesEfectivo = null;

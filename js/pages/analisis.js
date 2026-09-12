@@ -100,19 +100,19 @@ const PaginaAnalisis = (() => {
     for (const f of filasAObjetos(raw.colillas_descuentos, ["Periodo", "Concepto", "Categoria", "Valor"])) {
       movs.push({ Fuente: "Colilla (descuento)", Periodo: f.Periodo, Concepto: f.Concepto, Categoria: f.Categoria, Moneda: "COP", Valor: -toNumber(f.Valor) });
     }
-    for (const f of filasAObjetos(raw.visa_detalle, EGRESO_COLS)) {
+    for (const f of filasAObjetos(raw.visa_detalle, EGRESO_COLS, ["FechaCompra"])) {
       movs.push({ Fuente: "Visa ****7497", Periodo: f.FechaCompra, Concepto: f.Comercio, Categoria: f.Categoria, Moneda: "COP", Valor: -toNumber(f.ValorCargado) });
     }
-    for (const f of filasAObjetos(raw.mc_detalle, EGRESO_COLS)) {
+    for (const f of filasAObjetos(raw.mc_detalle, EGRESO_COLS, ["FechaCompra"])) {
       movs.push({ Fuente: "Mastercard ****5922", Periodo: f.FechaCompra, Concepto: f.Comercio, Categoria: f.Categoria, Moneda: "COP", Valor: -toNumber(f.ValorCargado) });
     }
-    for (const f of filasAObjetos(raw.mc_detalle_usd, EGRESO_COLS)) {
+    for (const f of filasAObjetos(raw.mc_detalle_usd, EGRESO_COLS, ["FechaCompra"])) {
       movs.push({ Fuente: "Mastercard ****5922 (USD)", Periodo: f.FechaCompra, Concepto: f.Comercio, Categoria: f.Categoria, Moneda: "USD", Valor: -toNumber(f.ValorCargado) });
     }
-    for (const f of filasAObjetos(raw.efectivo_detalle, EGRESO_COLS)) {
+    for (const f of filasAObjetos(raw.efectivo_detalle, EGRESO_COLS, ["FechaCompra"])) {
       movs.push({ Fuente: "Cuenta de ahorros", Periodo: f.FechaCompra, Concepto: f.Comercio, Categoria: f.Categoria, Moneda: "COP", Valor: -toNumber(f.ValorCargado) });
     }
-    for (const f of filasAObjetos(raw.otros_ingresos, ["Fecha", "Concepto", "Categoria", "Valor", "Notas"])) {
+    for (const f of filasAObjetos(raw.otros_ingresos, ["Fecha", "Concepto", "Categoria", "Valor", "Notas"], ["Fecha"])) {
       movs.push({ Fuente: "Otros ingresos", Periodo: f.Fecha, Concepto: f.Concepto, Categoria: f.Categoria, Moneda: "COP", Valor: toNumber(f.Valor) });
     }
 

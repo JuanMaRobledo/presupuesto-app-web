@@ -25,9 +25,9 @@ const PaginaEgresos = (() => {
     if (datosCache) return datosCache;
     const raw = await SheetsApi.batchGet(["efectivo_detalle", "visa_detalle", "mc_detalle"]);
     datosCache = {
-      efectivo_detalle: filasAObjetos(raw.efectivo_detalle, EGRESO_COLS),
-      visa_detalle: filasAObjetos(raw.visa_detalle, EGRESO_COLS),
-      mc_detalle: filasAObjetos(raw.mc_detalle, EGRESO_COLS),
+      efectivo_detalle: filasAObjetos(raw.efectivo_detalle, EGRESO_COLS, ["FechaCompra"]),
+      visa_detalle: filasAObjetos(raw.visa_detalle, EGRESO_COLS, ["FechaCompra"]),
+      mc_detalle: filasAObjetos(raw.mc_detalle, EGRESO_COLS, ["FechaCompra"]),
     };
     return datosCache;
   }
