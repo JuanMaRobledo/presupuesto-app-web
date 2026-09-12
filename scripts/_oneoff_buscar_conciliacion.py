@@ -32,32 +32,48 @@ def main():
     for ws in hojas:
         print(f"- '{ws.title}' ({ws.row_count} filas x {ws.col_count} cols)")
 
-    print("\n=== Hojas que mencionan conciliacion/diagnostico/fondo/pibank en el título ===")
-    for ws in hojas:
-        t = ws.title.lower()
-        if any(p in t for p in ("conciliaci", "diagnostic", "fondo", "pibank")):
-            print(f"-> '{ws.title}'")
+    # ---- 'Conciliación' completa ----
+    conc = next((ws for ws in hojas if ws.title == "Conciliación"), None)
+    if conc is not None:
+        print(f"\n=== Contenido completo de 'Conciliación' ({conc.row_count}x{conc.col_count}) ===")
+        for i, fila in enumerate(conc.get_all_values()):
+            if any(c.strip() for c in fila):
+                print(f"Fila {i+1}: {fila}")
 
-    # Buscar la hoja de "Libro crudo" (nombre exacto puede variar un poco).
-    libro_crudo = next((ws for ws in hojas if "libro crudo" in ws.title.lower()), None)
-    if libro_crudo is None:
-        print("\nNo encontré ninguna hoja 'Libro crudo...'.")
-        return
+    # ---- 'Cuenta 1031 - Auditoría' (el "libro crudo" de la cuenta bancaria) ----
+    libro = next((ws for ws in hojas if ws.title == "Cuenta 1031 - Auditoría"), None)
+    if libro is not None:
+        valores = libro.get_all_values()
+        print(f"\n=== 'Cuenta 1031 - Auditoría': {len(valores)} filas totales ===")
+        print(f"Encabezado: {valores[0] if valores else '(vacía)'}")
+        periodos = sorted(set(fila[0] for fila in valores[1:] if fila and fila[0] and fila[0][:2] == "20"))
+        if periodos:
+            print(f"Rango real de datos: {periodos[0]} a {periodos[-1]} ({len(periodos)} períodos)")
+        print("\n--- Filas que mencionan FONDO o PIBANK ---")
+        encontradas = 0
+        for i, fila in enumerate(valores):
+            texto = " | ".join(fila).upper()
+            if "FONDO" in texto or "PIBANK" in texto:
+                print(f"Fila {i+1}: {fila}")
+                encontradas += 1
+        print(f"Total: {encontradas} filas")
 
-    print(f"\n=== Filas de '{libro_crudo.title}' que mencionan FONDO o PIBANK (cualquier fecha) ===")
-    valores = libro_crudo.get_all_values()  # incluye encabezados
-    encontradas = 0
-    for i, fila in enumerate(valores):
-        texto = " | ".join(fila).upper()
-        if "FONDO" in texto or "PIBANK" in texto:
+    # ---- 'Auditoría' (por si acá está la conciliación real) ----
+    aud = next((ws for ws in hojas if ws.title == "Auditoría"), None)
+    if aud is not None:
+        valores = aud.get_all_values()
+        print(f"\n=== 'Auditoría': {len(valores)} filas totales ===")
+        print(f"Encabezado: {valores[0] if valores else '(vacía)'}")
+        for i, fila in enumerate(valores[:5]):
             print(f"Fila {i+1}: {fila}")
-            encontradas += 1
-    print(f"\nTotal filas encontradas: {encontradas} (de {len(valores)} filas totales en la hoja)")
-
-    print(f"\n=== Rango de fechas real en '{libro_crudo.title}' (columna Periodo, col A) ===")
-    periodos = sorted(set(fila[0] for fila in valores[1:] if fila and fila[0] and fila[0][:2] == "20"))
-    if periodos:
-        print(f"Desde {periodos[0]} hasta {periodos[-1]} -- {len(periodos)} períodos distintos con datos reales")
+        print("--- Filas que mencionan FONDO o PIBANK ---")
+        encontradas = 0
+        for i, fila in enumerate(valores):
+            texto = " | ".join(fila).upper()
+            if "FONDO" in texto or "PIBANK" in texto:
+                print(f"Fila {i+1}: {fila}")
+                encontradas += 1
+        print(f"Total: {encontradas} filas")
 
 
 if __name__ == "__main__":
