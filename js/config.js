@@ -9,7 +9,7 @@
 //   - http://localhost:8000            (para probar en local)
 // y pegá el Client ID acá abajo.
 const CONFIG = {
-  CLIENT_ID: "PEGA_ACA_TU_OAUTH_CLIENT_ID.apps.googleusercontent.com",
+  CLIENT_ID: "289024704945-jvmttgv33s0h9aqtvghqg1hrmtsftesu.apps.googleusercontent.com"
   SHEET_ID: "1wImfL85jPWKUwbcGb6gX7Ug4-3peEiXyp0lIcroycIk",
   // Alcance de solo lectura — esta primera versión no escribe nada al Sheet.
   SCOPES: "https://www.googleapis.com/auth/spreadsheets.readonly",
