@@ -8,7 +8,7 @@ const PAGINAS = {
   "🏦 Deudas": { modulo: () => PaginaDeudas, disponible: true },
   "📈 Inversiones": { modulo: () => PaginaInversiones, disponible: true },
   "🏢 Estados Financieros": { disponible: false },
-  "💰 Ingresos": { disponible: false },
+  "💰 Ingresos": { modulo: () => PaginaIngresos, disponible: true },
   "💳 Egresos": { modulo: () => PaginaEgresos, disponible: true },
   "🧾 Facturación Electrónica": { disponible: false },
   "📑 Declaraciones de Renta": { disponible: false },

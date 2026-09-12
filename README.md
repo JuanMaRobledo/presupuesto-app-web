@@ -34,6 +34,11 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   depósitos y retiros por plataforma, capital neto transferido en el
   tiempo, y posiciones (cantidad, precio, valor de mercado,
   ganancia/pérdida) de cada moneda.
+- 💰 Ingresos — sub-tabs Colillas de Pago (resumen histórico, tendencia por
+  quincena, y el detalle devengos/descuentos tanto general como filtrado a
+  un mes puntual, quincena por quincena) y Otros Ingresos (búsqueda,
+  filtros, "ocultar no presupuestar", agrupamiento de Rendimientos
+  Financieros por mes, total por categoría y gráfico).
 
 ⏳ Todavía no portado (usá la versión de Streamlit mientras tanto):
 - El gráfico de "Tendencia de los últimos meses" al pie de Resumen
@@ -43,8 +48,9 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
 - Dentro de Deudas: el formulario "Actualizar deudas manualmente" (escritura)
 - Dentro de Inversiones: patrimonio unificado, actualizar precios (Yahoo
   Finance), historial de operaciones del broker, Crecimiento y Rentabilidad
+- Dentro de Ingresos: agregar/eliminar una colilla o un ingreso (escritura)
 - 📊 Análisis, 📋 Presupuesto,
-  🏢 Estados Financieros, 💰 Ingresos, 🧾 Facturación Electrónica,
+  🏢 Estados Financieros, 🧾 Facturación Electrónica,
   📑 Declaraciones de Renta
 - Cualquier operación de **escritura** (agregar/editar/borrar) — esta primera
   versión es de solo lectura
