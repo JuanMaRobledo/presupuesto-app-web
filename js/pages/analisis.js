@@ -1,17 +1,40 @@
 // Puerto (parcial, solo lectura) de render_analisis() (app_presupuesto.py):
-// por ahora solo las sub-secciones Categorías y Movimientos.
+// Categorías, Movimientos, Esenciales/No Esenciales y Balance Mensual (esta
+// última con escritura — mueve el selector de mes en la hoja 'Balance
+// Mensual' del Sheet, mismo protocolo que Presupuesto).
 //
-// TODAVÍA NO portado: Esenciales/No Esenciales, Evolución, Año vs. Año y
-// Balance Mensual (esta última además necesita escritura — mueve un
-// selector de mes en la hoja 'Balance Mensual' del Sheet).
+// TODAVÍA NO portado: Evolución y Año vs. Año — ambas leen dinámicamente el
+// encabezado de la hoja 'Resumen Mensual' (formulada, sin un layout fijo en
+// código) y requieren confirmar el orden real de columnas contra el Sheet
+// antes de portarlas, para no arriesgar cruzar mal un número financiero.
 
 const PaginaAnalisis = (() => {
   const EGRESO_COLS = [
     "PeriodoExtracto", "FechaCompra", "Comercio", "Moneda", "Cuotas", "ValorTotal",
     "ValorCargado", "SaldoPendiente", "Categoria", "Reembolsable", "Notas",
   ];
+  // Puerto de CATEGORIAS_ESENCIALES/CATEGORIAS_NO_ESENCIALES/CATEGORIAS_NO_CONSUMO
+  // y clasificar_esencial() (cuenta_formatos.py).
+  const CATEGORIAS_ESENCIALES = new Set([
+    "Mercado y Supermercado", "Salud", "Seguros", "Vivienda y Servicios", "Transporte",
+    "Educación y Profesional", "Servicio doméstico", "Cuidado Personal", "Apoyo familiar",
+  ]);
+  const CATEGORIAS_NO_ESENCIALES = new Set([
+    "Restaurantes y Domicilios", "Entretenimiento", "Viajes", "Tecnología y Suscripciones",
+    "Mascotas", "Compras Online / Varios", "Otros",
+  ]);
+  const CATEGORIAS_NO_CONSUMO = new Set(["Inversiones", "Ahorro"]);
+  function clasificarEsencial(categoria) {
+    if (CATEGORIAS_ESENCIALES.has(categoria)) return "Esencial";
+    if (CATEGORIAS_NO_ESENCIALES.has(categoria)) return "No esencial";
+    if (CATEGORIAS_NO_CONSUMO.has(categoria)) return "No consumo (ahorro/inversión)";
+    return "Sin clasificar";
+  }
+
   let chartCategorias = null;
   let chartTopCategorias = null;
+  let chartEsenciales = null;
+  let mesBalanceAplicado = null;
 
   function render(container) {
     container.innerHTML = `
@@ -19,11 +42,13 @@ const PaginaAnalisis = (() => {
       <p class="caption">Cómo va tu gasto visto desde distintos ángulos.</p>
       <div class="tabs" id="tabs-analisis">
         <button class="tab-btn activo" data-tab="categorias">Categorías</button>
+        <button class="tab-btn" data-tab="esenciales">Esenciales / No Esenciales</button>
         <button class="tab-btn" data-tab="movimientos">Movimientos</button>
+        <button class="tab-btn" data-tab="balance">Balance Mensual</button>
       </div>
       <div id="panel-analisis">Cargando datos del Sheet…</div>
-      <div class="aviso">⚠️ Todavía no portadas: Esenciales/No Esenciales, Evolución, Año vs. Año y Balance
-      Mensual — usá <a href="https://presupuesto-app-jmr.streamlit.app" target="_blank" rel="noopener">la
+      <div class="aviso">⚠️ Todavía no portadas: Evolución y Año vs. Año — usá
+      <a href="https://presupuesto-app-jmr.streamlit.app" target="_blank" rel="noopener">la
       versión de Streamlit</a> para eso mientras tanto.</div>
     `;
     const tabsDiv = container.querySelector("#tabs-analisis");
@@ -42,7 +67,9 @@ const PaginaAnalisis = (() => {
       panel.innerHTML = "Cargando datos del Sheet…";
       try {
         if (activo === "categorias") await renderCategorias(panel);
-        else await renderMovimientos(panel);
+        else if (activo === "esenciales") await renderEsenciales(panel);
+        else if (activo === "movimientos") await renderMovimientos(panel);
+        else await renderBalanceMensual(panel);
       } catch (err) {
         panel.innerHTML = `<div class="error">Error cargando el Sheet: ${err.message}</div>`;
         console.error(err);
@@ -214,6 +241,278 @@ const PaginaAnalisis = (() => {
     busquedaInput.addEventListener("input", actualizar);
     actualizar();
   }
+
+  // ---------------------------------------------------------------------
+  // Esenciales / No Esenciales
+  // ---------------------------------------------------------------------
+  async function cargarClasificacionEsencial() {
+    const raw = await SheetsApi.batchGet(["clasificacion_esencial"]);
+    const map = {};
+    for (const r of raw.clasificacion_esencial || []) {
+      if (r && r[0] && r[1]) map[r[0]] = r[1];
+    }
+    return map;
+  }
+
+  async function renderEsenciales(panel) {
+    const [movs, clasifOverride] = await Promise.all([cargarMovimientos(), cargarClasificacionEsencial()]);
+    const clasificar = (categoria) => clasifOverride[categoria] || clasificarEsencial(categoria);
+
+    const gasto = movs
+      .filter((m) => m.Valor < 0 && m.Moneda === "COP" && m._presupuestar && m.Fuente !== "Colilla (descuento)")
+      .map((m) => ({ ...m, Valor: Math.abs(m.Valor), Clasificacion: clasificar(m.Categoria) }))
+      .filter((m) => m.Clasificacion !== "No consumo (ahorro/inversión)");
+
+    if (!gasto.length) {
+      panel.innerHTML = "<p>Todavía no hay gasto de consumo para clasificar.</p>";
+      return;
+    }
+    const gastoConPeriodo = gasto.map((m) => {
+      const [anio, mes] = extraerAnioMes(m.Periodo);
+      return { ...m, _anio: anio, _mes: mes };
+    });
+
+    panel.innerHTML = `
+      <h4>Gasto esencial vs. no esencial</h4>
+      <p class="caption">Incluye solo gasto de consumo real en pesos (Visa/Mastercard en COP y Egresos -
+      Efectivo, sin los movimientos "(no presupuestar)"). No incluye compras en USD, descuentos de nómina ni
+      Ahorro/Inversiones. La clasificación de cada categoría se lee de la hoja 'Categorías Esenciales' del
+      Sheet — editala ahí directamente para corregirla.</p>
+      <div class="row"><select id="es_anio"></select><select id="es_mes"></select></div>
+      <div id="es_contenido"></div>
+    `;
+    const anioSel = panel.querySelector("#es_anio");
+    const mesSel = panel.querySelector("#es_mes");
+    anioSel.add(new Option("(todos)", "(todos)"));
+    [...new Set(gastoConPeriodo.map((m) => m._anio).filter(Boolean))].sort((a, b) => b - a)
+      .forEach((a) => anioSel.add(new Option(a, a)));
+    mesSel.add(new Option("(todos)", "(todos)"));
+    for (let m = 1; m <= 12; m++) mesSel.add(new Option(`${String(m).padStart(2, "0")} - ${MESES_NOMBRE[m]}`, m));
+
+    function actualizar() {
+      let f = gastoConPeriodo;
+      if (anioSel.value !== "(todos)") f = f.filter((x) => x._anio === Number(anioSel.value));
+      if (mesSel.value !== "(todos)") f = f.filter((x) => x._mes === Number(mesSel.value));
+      const contenido = panel.querySelector("#es_contenido");
+      if (!f.length) {
+        contenido.innerHTML = "<p>No hay gasto para ese año/mes.</p>";
+        if (chartEsenciales) { chartEsenciales.destroy(); chartEsenciales = null; }
+        return;
+      }
+
+      const porClasif = {};
+      for (const x of f) porClasif[x.Clasificacion] = (porClasif[x.Clasificacion] || 0) + x.Valor;
+      const totalGasto = Object.values(porClasif).reduce((s, v) => s + v, 0);
+
+      contenido.innerHTML = `
+        <div class="metric-row">
+          ${["Esencial", "No esencial", "Sin clasificar"].map((c) => {
+            const v = porClasif[c] || 0;
+            const pct = totalGasto ? (v / totalGasto * 100) : 0;
+            return metric(`${c} (${pct.toFixed(0)}%)`, fmtMoneda(v));
+          }).join("")}
+        </div>
+        <canvas id="es_chart" height="200"></canvas>
+        <h5>Detalle por categoría</h5>
+        <div class="tabla-scroll"><table class="tabla" id="es_tabla"></table></div>
+        <div id="es_aviso_sin_clasificar"></div>
+      `;
+
+      if (chartEsenciales) chartEsenciales.destroy();
+      const clasifPresentes = Object.keys(porClasif);
+      chartEsenciales = new Chart(contenido.querySelector("#es_chart").getContext("2d"), {
+        type: "doughnut",
+        data: { labels: clasifPresentes, datasets: [{ data: clasifPresentes.map((c) => porClasif[c]), backgroundColor: PALETA }] },
+        options: { responsive: true },
+      });
+
+      const porCatClasif = {};
+      for (const x of f) {
+        const key = `${x.Clasificacion}|||${x.Categoria}`;
+        porCatClasif[key] = (porCatClasif[key] || 0) + x.Valor;
+      }
+      const detalle = Object.entries(porCatClasif)
+        .map(([key, v]) => { const [clasif, cat] = key.split("|||"); return { clasif, cat, v }; })
+        .sort((a, b) => a.clasif.localeCompare(b.clasif) || b.v - a.v);
+      contenido.querySelector("#es_tabla").innerHTML = `
+        <thead><tr><th>Clasificación</th><th>Categoría</th><th>Valor</th></tr></thead>
+        <tbody>${detalle.map((d) => `<tr><td>${d.clasif}</td><td>${d.cat}</td><td>${fmtMoneda(d.v)}</td></tr>`).join("")}</tbody>
+      `;
+
+      if (porClasif["Sin clasificar"]) {
+        const catsSinClasificar = [...new Set(f.filter((x) => x.Clasificacion === "Sin clasificar").map((x) => x.Categoria))].sort();
+        contenido.querySelector("#es_aviso_sin_clasificar").innerHTML =
+          `<div class="aviso">⚠️ Categorías sin clasificar todavía (avisame si son esenciales o no): ${catsSinClasificar.join(", ")}</div>`;
+      }
+    }
+    anioSel.addEventListener("change", actualizar);
+    mesSel.addEventListener("change", actualizar);
+    actualizar();
+  }
+
+  // ---------------------------------------------------------------------
+  // Balance Mensual
+  // ---------------------------------------------------------------------
+  function celdaBalance(vals, fila, col) {
+    const row = (fila - 6 >= 0 && fila - 6 < vals.length) ? (vals[fila - 6] || []) : [];
+    return row[col - 1] !== undefined ? row[col - 1] : null;
+  }
+
+  function tablaBalance(vals, filaIni, filaFin) {
+    const filas = [];
+    for (let f = filaIni; f <= filaFin; f++) {
+      const nombre = celdaBalance(vals, f, 1);
+      if (nombre) filas.push({ nombre, valor: toNumber(celdaBalance(vals, f, 2)) });
+    }
+    return filas;
+  }
+
+  function parseBalanceMensual(vals) {
+    return {
+      ingresosBrutos: toNumber(celdaBalance(vals, 6, 2)),
+      egresosTarjetasEfectivo: toNumber(celdaBalance(vals, 6, 7)),
+      descuentosNomina: toNumber(celdaBalance(vals, 6, 12)),
+      balance: toNumber(celdaBalance(vals, 6, 17)),
+      egresosPorMetodo: tablaBalance(vals, 14, 16),
+      descuentosPorCategoria: tablaBalance(vals, 35, 42),
+      ingresosPorFuente: tablaBalance(vals, 60, 61),
+    };
+  }
+
+  // Puerto de _egresos_consumo_mes() (app_presupuesto.py): a diferencia de
+  // read_balance_mensual() (que viene desplazado por la fórmula de la hoja
+  // según el corte de tarjeta), esto cuenta cada compra en el mes en que se
+  // hizo de verdad (Fecha Compra), no en el que se paga.
+  async function egresosConsumoMes(mesStr) {
+    const anioObj = Number(mesStr.slice(0, 4));
+    const mesObj = Number(mesStr.slice(5, 7));
+    const raw = await SheetsApi.batchGet(["efectivo_detalle", "visa_detalle", "mc_detalle"]);
+    let total = 0;
+    const filas = [];
+    for (const [rango, nombre] of [["efectivo_detalle", "Efectivo"], ["visa_detalle", "Visa"], ["mc_detalle", "Mastercard"]]) {
+      const detalle = filasAObjetos(raw[rango], EGRESO_COLS, ["FechaCompra"]);
+      let valor = 0;
+      for (const f of detalle) {
+        if (f.Moneda !== "COP" || esNoPresupuestar(f.Categoria)) continue;
+        const [a, m] = extraerAnioMes(f.FechaCompra);
+        if (a === anioObj && m === mesObj) valor += toNumber(f.ValorCargado);
+      }
+      filas.push({ nombre, valor });
+      total += valor;
+    }
+    return { total, filas };
+  }
+
+  async function renderBalanceMensual(panel) {
+    panel.innerHTML = `
+      <h4>Balance Mensual</h4>
+      <p class="caption">Vista efectivo real: todo lo que se paga e ingresa efectivamente este mes. El egreso
+      de tarjeta se cuenta en el mes en que realmente se paga (no el mes del extracto) — el efectivo se cuenta
+      en su propio mes. No se suman los meses entre sí.</p>
+      <div class="row"><select id="bal_anio"></select><select id="bal_mes"></select></div>
+      <div id="bal_contenido">Cargando…</div>
+    `;
+    const hoy = new Date();
+    const selAnio = panel.querySelector("#bal_anio");
+    const selMes = panel.querySelector("#bal_mes");
+    for (let a = 2023; a <= 2032; a++) selAnio.add(new Option(a, a));
+    selAnio.value = hoy.getFullYear();
+    for (let m = 1; m <= 12; m++) selMes.add(new Option(MESES_NOMBRE[m], m));
+    selMes.value = hoy.getMonth() + 1;
+    selAnio.addEventListener("change", () => renderBalanceContenido(panel));
+    selMes.addEventListener("change", () => renderBalanceContenido(panel));
+
+    await renderBalanceContenido(panel);
+  }
+
+  async function renderBalanceContenido(panel) {
+    const contenido = panel.querySelector("#bal_contenido");
+    const anio = Number(panel.querySelector("#bal_anio").value);
+    const mesNum = Number(panel.querySelector("#bal_mes").value);
+    const mesStr = `${anio}-${String(mesNum).padStart(2, "0")}`;
+    contenido.innerHTML = "Cargando…";
+    try {
+      const claveMes = `${anio}-${mesNum}`;
+      if (mesBalanceAplicado !== claveMes) {
+        await SheetsApi.batchUpdateRanges([
+          { range: "'Balance Mensual'!E4", values: [[anio]] },
+          { range: "'Balance Mensual'!G4", values: [[MESES_NOMBRE[mesNum]]] },
+        ]);
+        mesBalanceAplicado = claveMes;
+      }
+      const raw = await SheetsApi.batchGet(["balance_mensual"]);
+      const datos = parseBalanceMensual(raw.balance_mensual || []);
+
+      contenido.innerHTML = `
+        <div class="row">
+          <label><input type="radio" name="bal_vista" value="efectivo" checked> 💳 Efectivo real (mes en que se paga)</label>
+          <label><input type="radio" name="bal_vista" value="consumo"> 🛍️ Consumo (mes en que se compra)</label>
+        </div>
+        <div id="bal_metricas"></div>
+        <div class="col-3" id="bal_tablas"></div>
+      `;
+      const radios = contenido.querySelectorAll('input[name="bal_vista"]');
+
+      async function actualizarVista() {
+        const vista = [...radios].find((r) => r.checked).value;
+        let egresosMostrar, tablaMetodoMostrar, balanceMostrar, etiquetaEgresos;
+        if (vista === "consumo") {
+          contenido.querySelector("#bal_metricas").innerHTML = "Calculando…";
+          const { total, filas } = await egresosConsumoMes(mesStr);
+          egresosMostrar = total;
+          tablaMetodoMostrar = filas;
+          balanceMostrar = datos.ingresosBrutos - total - datos.descuentosNomina;
+          etiquetaEgresos = "Gasto de consumo (tarjetas + efectivo)";
+        } else {
+          egresosMostrar = datos.egresosTarjetasEfectivo;
+          tablaMetodoMostrar = datos.egresosPorMetodo.map((f) => ({ nombre: f.nombre, valor: f.valor }));
+          balanceMostrar = datos.balance;
+          etiquetaEgresos = "Egresos (tarjetas + efectivo)";
+        }
+
+        contenido.querySelector("#bal_metricas").innerHTML = `
+          <div class="metric-row">
+            ${metric("Ingresos brutos", fmtMoneda(datos.ingresosBrutos))}
+            ${metric(etiquetaEgresos, fmtMoneda(egresosMostrar))}
+            ${metric("Descuentos de nómina", fmtMoneda(datos.descuentosNomina))}
+            ${metric("Balance del mes", fmtMoneda(balanceMostrar))}
+          </div>
+        `;
+
+        contenido.querySelector("#bal_tablas").innerHTML = `
+          <div>
+            <h5>Egresos por método de pago</h5>
+            <table class="tabla"><thead><tr><th>Método</th><th>Valor</th></tr></thead>
+              <tbody>${tablaMetodoMostrar.map((f) => `<tr><td>${f.nombre}</td><td>${fmtMoneda(f.valor)}</td></tr>`).join("")}</tbody>
+            </table>
+          </div>
+          <div>
+            <h5>Descuentos de nómina por categoría</h5>
+            <table class="tabla"><thead><tr><th>Categoría</th><th>Valor</th></tr></thead>
+              <tbody>${datos.descuentosPorCategoria.map((f) => `<tr><td>${f.nombre}</td><td>${fmtMoneda(f.valor)}</td></tr>`).join("")}</tbody>
+            </table>
+          </div>
+          <div>
+            <h5>Ingresos por fuente</h5>
+            <table class="tabla"><thead><tr><th>Fuente</th><th>Valor</th></tr></thead>
+              <tbody>${datos.ingresosPorFuente.map((f) => `<tr><td>${f.nombre}</td><td>${fmtMoneda(f.valor)}</td></tr>`).join("")}</tbody>
+            </table>
+          </div>
+        `;
+      }
+      radios.forEach((r) => r.addEventListener("change", actualizarVista));
+      await actualizarVista();
+    } catch (err) {
+      contenido.innerHTML = `<div class="error">Error cargando el Sheet: ${err.message}</div>`;
+      console.error(err);
+    }
+  }
+
+  function metric(label, value) {
+    return `<div class="metric"><div class="metric-label">${label}</div><div class="metric-value">${value}</div></div>`;
+  }
+
+  const PALETA = ["#d64545", "#4573d6", "#45a06a", "#d69a45", "#8a56c9", "#45b8c9", "#c9457e", "#a3a3a3"];
 
   return { render };
 })();

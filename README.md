@@ -81,9 +81,19 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   sitio: necesita el scope completo de Sheets + `drive.file` (ver más
   abajo).
 - 📊 Análisis — sub-tabs **Categorías** (gasto real histórico por categoría,
-  gráfico + tabla) y **Movimientos** (vista unificada devengado de las 7
+  gráfico + tabla), **Esenciales / No Esenciales** (gasto de consumo real
+  en pesos clasificado con `clasificar_esencial()` — la hoja 'Categorías
+  Esenciales' tiene prioridad sobre la clasificación por defecto —, con
+  gráfico de torta, detalle por categoría y aviso de categorías sin
+  clasificar todavía), **Movimientos** (vista unificada devengado de las 7
   fuentes: colillas devengo/descuento, Visa, Mastercard COP/USD, Cuenta de
-  ahorros y Otros Ingresos, con búsqueda/filtros y top categorías de gasto).
+  ahorros y Otros Ingresos, con búsqueda/filtros y top categorías de
+  gasto), y **Balance Mensual** — **con escritura**: mueve el selector de
+  mes de la hoja 'Balance Mensual' (mismo protocolo write-then-read que
+  Presupuesto) y lee sus 4 métricas + 3 tablas ya calculadas por las
+  fórmulas de la hoja, con el toggle Efectivo real (mes en que se paga) /
+  Consumo (mes en que se compra, recalculado del lado del cliente por
+  `Fecha Compra`).
 - 🏢 Estados Financieros — sub-tabs **Estado de Resultados** (Ingresos −
   Gastos operativos = Utilidad Neta, con desglose por categoría de ambos
   lados, mismo selector Total histórico/Un año/Un mes que Resumen — ahora
@@ -111,8 +121,11 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
   Finance — un sitio estático no puede consultarlo desde el navegador por
   CORS; historial de operaciones del broker ya está portado, salvo
   agregar un dividendo/editar el historial a mano)
-- Dentro de Análisis: Esenciales/No Esenciales, Evolución, Año vs. Año y
-  Balance Mensual (esta última también necesita escritura)
+- Dentro de Análisis: Evolución y Año vs. Año — ambas leen dinámicamente el
+  encabezado de la hoja 'Resumen Mensual' (formulada, sin un layout fijo
+  en código); requieren confirmar el orden real de columnas contra el
+  Sheet antes de portarlas (Esenciales/No Esenciales y Balance Mensual ya
+  están portados)
 - Dentro de Estados Financieros: Flujo de Efectivo y Auditoría Anual
   (necesitan la lógica de deduplicación por Notas que separa
   Financiación/Conciliación del resto de movimientos "no presupuestar")

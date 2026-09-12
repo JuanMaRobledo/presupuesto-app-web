@@ -52,4 +52,6 @@ const RANGOS = {
   // hoja (sin un límite fijo en BLOCKS) — acá se usa un tope generoso, igual
   // que el resto de los rangos de esta app.
   historial_inversion: "'Historial de Inversiones'!A2:J5000",
+  clasificacion_esencial: "'Categorías Esenciales'!A5:B60",
+  balance_mensual: "'Balance Mensual'!A6:Q61",
 };

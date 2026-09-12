@@ -136,8 +136,12 @@ select, .input-texto, input[type="number"], input[type="date"], input[type="text
 h5 { margin: 20px 0 8px; }
 
 .col-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 12px; }
+.col-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 24px; margin-top: 12px; }
 @media (max-width: 700px) {
-  .col-2 { grid-template-columns: 1fr; }
+  .col-2, .col-3 { grid-template-columns: 1fr; }
+}
+@media (min-width: 701px) and (max-width: 1000px) {
+  .col-3 { grid-template-columns: 1fr 1fr; }
 }
 
 .metric-row { display: flex; gap: 16px; flex-wrap: wrap; }
