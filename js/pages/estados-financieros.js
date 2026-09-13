@@ -3,6 +3,8 @@
 // saldo inicial/final real de un mes) y Auditoría Anual.
 
 const PaginaEstadosFinancieros = (() => {
+  let chartPatrimonio = null;
+
   function render(container) {
     container.innerHTML = `
       <h1>🏢 Estados Financieros</h1>
@@ -202,7 +204,85 @@ const PaginaEstadosFinancieros = (() => {
 
       <h5>Patrimonio Neto</h5>
       <div class="metric-row">${metric("Activos − Pasivos (pesos)", fmtMoneda(patrimonioNeto))}</div>
+      <div id="be-patrimonio-tiempo"></div>
     `;
+
+    // Guarda una foto de hoy cada vez que se abre esta pantalla (upsert por
+    // fecha -- mismo protocolo que guardarConciliacionEfectivo()) y muestra
+    // la serie en el tiempo si ya hay 2+ fotos. Nunca debe romper la vista
+    // de hoy si el Sheet falla por lo que sea.
+    try {
+      await guardarSnapshotPatrimonio(totalActivos, totalPasivos);
+    } catch (err) {
+      console.warn("No pude guardar el snapshot de patrimonio neto:", err.message);
+    }
+    try {
+      const rawHist = await SheetsApi.batchGet(["historial_patrimonio_neto"]);
+      const historial = filasAObjetos(rawHist.historial_patrimonio_neto,
+        ["Fecha", "Activos", "Pasivos", "PatrimonioNeto"], ["Fecha"]);
+      if (historial.length >= 2) {
+        const divTiempo = panel.querySelector("#be-patrimonio-tiempo");
+        divTiempo.innerHTML = `
+          <h5>Patrimonio Neto en el tiempo</h5>
+          <p class="caption">Una foto por día distinto que abriste esta pantalla (no es retroactivo: arranca
+          desde la primera vez que la viste). Dólares no incluidos, mismo criterio que arriba.</p>
+          <canvas id="be_chart_patrimonio" height="160"></canvas>
+        `;
+        renderChartPatrimonio(divTiempo.querySelector("#be_chart_patrimonio"), historial);
+      }
+    } catch (err) {
+      // Todavía no hay ninguna foto guardada (hoja recién creada en este
+      // mismo render, o el snapshot de arriba falló) -- sin gráfico por ahora.
+    }
+  }
+
+  // Puerto de guardar_snapshot_patrimonio() (sheets_backend.py) -- crea la
+  // hoja si es la primera vez (ver SheetsApi.crearHoja()), y hace upsert
+  // por fecha para no apilar fotos repetidas si se abre la pantalla varias
+  // veces el mismo día.
+  async function guardarSnapshotPatrimonio(activos, pasivos) {
+    const fechaISO = new Date().toISOString().slice(0, 10);
+    const [y, m, d] = fechaISO.split("-");
+    const fechaDDMM = `${d}/${m}/${y}`;
+    let filas;
+    try {
+      const raw = await SheetsApi.batchGet(["historial_patrimonio_neto"]);
+      filas = raw.historial_patrimonio_neto || [];
+    } catch (err) {
+      await SheetsApi.crearHoja("Historial de Patrimonio Neto", 2000, 4);
+      await SheetsApi.updateRange("'Historial de Patrimonio Neto'!A1:D1",
+        [["Fecha", "Activos", "Pasivos", "Patrimonio Neto"]], "RAW");
+      filas = [];
+    }
+    let filaExistente = null;
+    for (let i = 0; i < filas.length; i++) {
+      if (filas[i] && serialToText(filas[i][0]) === fechaDDMM) { filaExistente = i + 2; break; }
+    }
+    const valores = [fechaISO, activos, pasivos, activos - pasivos];
+    if (filaExistente) {
+      await SheetsApi.updateRange(`'Historial de Patrimonio Neto'!A${filaExistente}:D${filaExistente}`, [valores]);
+    } else {
+      await SheetsApi.appendRows(RANGOS.historial_patrimonio_neto, [valores]);
+    }
+  }
+
+  function renderChartPatrimonio(canvas, historial) {
+    const filas = historial
+      .map((f) => ({ fechaISO: parseFechaISO(f.Fecha), activos: toNumber(f.Activos), pasivos: toNumber(f.Pasivos), neto: toNumber(f.PatrimonioNeto) }))
+      .filter((f) => f.fechaISO)
+      .sort((a, b) => a.fechaISO.localeCompare(b.fechaISO));
+    chartPatrimonio?.destroy();
+    chartPatrimonio = new Chart(canvas.getContext("2d"), {
+      type: "line",
+      data: {
+        datasets: [
+          { label: "Activos", data: filas.map((f) => ({ x: f.fechaISO, y: f.activos })), borderColor: "#1d4ed8", backgroundColor: "#1d4ed8", tension: 0.1 },
+          { label: "Pasivos", data: filas.map((f) => ({ x: f.fechaISO, y: f.pasivos })), borderColor: "#dc2626", backgroundColor: "#dc2626", tension: 0.1 },
+          { label: "Patrimonio Neto", data: filas.map((f) => ({ x: f.fechaISO, y: f.neto })), borderColor: "#0ca30c", backgroundColor: "#0ca30c", tension: 0.1 },
+        ],
+      },
+      options: { responsive: true, parsing: false, scales: { x: { type: "category" }, y: { ticks: { callback: (v) => fmtMoneda(v) } } } },
+    });
   }
 
   // ---------------------------------------------------------------------

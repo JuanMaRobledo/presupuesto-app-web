@@ -143,8 +143,30 @@ const SheetsApi = (() => {
     return porTitulo;
   }
 
+  // Crea una hoja/pestaña nueva vacía (estructura, no valores -- endpoint
+  // distinto de values:batchUpdate) -- equivalente a
+  // spreadsheet.add_worksheet() de gspread. Usalo antes de escribir en una
+  // hoja que todavía no existe (p. ej. el primer snapshot de una serie
+  // histórica nueva); el mismo scope "spreadsheets" ya cubre esto, no hace
+  // falta ningún scope nuevo.
+  async function crearHoja(titulo, filas = 2000, columnas = 10) {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}:batchUpdate`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token()}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        requests: [{ addSheet: { properties: { title: titulo, gridProperties: { rowCount: filas, columnCount: columnas } } } }],
+      }),
+    });
+    if (!res.ok) {
+      const texto = await res.text();
+      throw new Error(`Error ${res.status} creando la hoja '${titulo}': ${texto}`);
+    }
+    return res.json();
+  }
+
   return {
     batchGet, updateRange, batchUpdateRanges, appendRows, clearRange, batchClearRanges,
-    listarHojas, batchGetHojasCompletas,
+    listarHojas, batchGetHojasCompletas, crearHoja,
   };
 })();

@@ -249,7 +249,15 @@ GitHub Pages abre esa portada.
   Resultados (Ingresos − Gastos operativos = Utilidad Neta, con desglose
   por categoría de ambos lados, mismo selector Total histórico/Un año/Un
   mes que Resumen), Balance General (Activos − Pasivos = Patrimonio Neto,
-  foto de hoy), Flujo de Efectivo (Saldo Inicial + Operación + Inversión +
+  foto de hoy — y "Patrimonio Neto en el tiempo": guarda una foto de
+  Activos/Pasivos/Patrimonio Neto cada vez que se abre esta pantalla, con
+  upsert por fecha en una hoja nueva "Historial de Patrimonio Neto" que se
+  crea sola la primera vez (mismo protocolo que el snapshot de valor de
+  cartera de 📈 Inversiones, pero disparado al VER la pantalla en vez de al
+  guardar algo, porque acá no hay ninguna acción de guardado que lo
+  dispare sola); el gráfico de tendencia aparece recién con 2+ fotos, y no
+  es retroactivo — arranca desde la primera vez que se abrió la pantalla
+  después de este cambio), Flujo de Efectivo (Saldo Inicial + Operación + Inversión +
   Financiación + Conciliación = Saldo Final Calculado de un mes puntual,
   con "💾 Guardar saldos de este mes" — mismo protocolo upsert-por-clave
   que `guardar_conciliacion_efectivo()` — y "🔎 Ver desglose del mes"

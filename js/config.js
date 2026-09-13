@@ -65,4 +65,8 @@ const RANGOS = {
   // Mes | Ingresos ganados | Gastos personales | Deudas y obligaciones |
   // Ahorro e inversiones | Disponible del mes).
   resumen_mensual: "'Resumen Mensual'!B5:G30",
+  // La crea (y escribe) esta misma app -- y también Streamlit -- la primera
+  // vez que se abre Balance General; no existe en el Sheet hasta entonces
+  // (mismo caso que datos_mercado/historial_valor_cartera arriba).
+  historial_patrimonio_neto: "'Historial de Patrimonio Neto'!A2:D5000",
 };
