@@ -478,11 +478,15 @@ const PaginaInversiones = (() => {
           ${metric("Dólares (USD)", fmtUsd(patrimonioDolares))}
         </div>
         ${hayLiquidez ? `
-          <h5>💰 Efectivo, margen y cuentas de liquidez</h5>
-          <div class="metric-row">
-            ${metric("Pesos (COP)", fmtMoneda(cajaPesos))}
-            ${metric("Dólares (USD)", fmtUsd(cajaDolares))}
-          </div>` : ""}
+          <details class="panel-colapsable" open>
+            <summary>💰 Efectivo, margen y cuentas de liquidez</summary>
+            <div class="panel-colapsable-body">
+              <div class="metric-row">
+                ${metric("Pesos (COP)", fmtMoneda(cajaPesos))}
+                ${metric("Dólares (USD)", fmtUsd(cajaDolares))}
+              </div>
+            </div>
+          </details>` : ""}
       `;
       return;
     }
@@ -510,32 +514,40 @@ const PaginaInversiones = (() => {
       <p class="caption">TRM $${trm.toLocaleString("en-US", { maximumFractionDigits: 2 })} COP/USD
       (${datos.mercado.trmFecha || "sin fecha"}) — la actualiza un GitHub Action programado (no en vivo desde el
       navegador: Yahoo Finance bloquea ese acceso por CORS a un sitio estático).</p>
-      <h5>📐 Rentabilidad unificada</h5>
-      <p class="caption">Un solo XIRR combinando los aportes/retiros de pesos y dólares (los de dólares ya
-      están registrados en pesos transferidos, así que se juntan sin convertir nada) contra el valor final de
-      ambas carteras hoy, convertido a pesos con la TRM de hoy. Sobre <strong>capital propio</strong> —
-      descuenta el margen prestado por el bróker del valor final en cualquiera de las dos monedas (no como una
-      pérdida, sino como plata que no es tuya).</p>
-      <div class="metric-row">
-        ${metric("XIRR unificado (pesos + dólares, sobre capital propio)",
-          (() => {
-            const xirrUnificado = rentabilidadXirrUnificada(datos.aportesPesos, datos.aportesDolares,
-              patrimonioPesos + cajaPesos, patrimonioDolares + cajaDolares, trm);
-            return xirrUnificado !== null ? `${(xirrUnificado * 100).toFixed(1)}%` : "—";
-          })())}
-      </div>
-      <div id="patrimonio_rentper_unificada"></div>
+      <details class="panel-colapsable" open>
+        <summary>📐 Rentabilidad unificada</summary>
+        <div class="panel-colapsable-body">
+          <p class="caption">Un solo XIRR combinando los aportes/retiros de pesos y dólares (los de dólares ya
+          están registrados en pesos transferidos, así que se juntan sin convertir nada) contra el valor final de
+          ambas carteras hoy, convertido a pesos con la TRM de hoy. Sobre <strong>capital propio</strong> —
+          descuenta el margen prestado por el bróker del valor final en cualquiera de las dos monedas (no como una
+          pérdida, sino como plata que no es tuya).</p>
+          <div class="metric-row">
+            ${metric("XIRR unificado (pesos + dólares, sobre capital propio)",
+              (() => {
+                const xirrUnificado = rentabilidadXirrUnificada(datos.aportesPesos, datos.aportesDolares,
+                  patrimonioPesos + cajaPesos, patrimonioDolares + cajaDolares, trm);
+                return xirrUnificado !== null ? `${(xirrUnificado * 100).toFixed(1)}%` : "—";
+              })())}
+          </div>
+          <div id="patrimonio_rentper_unificada"></div>
+        </div>
+      </details>
       ${hayLiquidez ? `
-        <h5>💰 Efectivo, margen y cuentas de liquidez</h5>
-        <p class="caption">Aparte de las inversiones de arriba — efectivo/deuda de margen en el broker y
-        la Fiducuenta (reserva de impuestos), sin retorno de mercado. Un valor negativo es
-        financiación del broker (deuda), no una pérdida. No cuenta para "Total en inversiones", pero SÍ se
-        descuenta en el XIRR unificado de arriba (sobre capital propio).</p>
-        <div class="metric-row">
-          ${metric("Pesos (COP)", fmtMoneda(cajaPesos))}
-          ${metric(`Dólares → COP (TRM $${trm.toLocaleString("en-US", { maximumFractionDigits: 0 })})`, fmtMoneda(cajaDolaresCop))}
-          ${metric("Total liquidez (COP)", fmtMoneda(cajaTotalCop))}
-        </div>` : ""}
+        <details class="panel-colapsable" open>
+          <summary>💰 Efectivo, margen y cuentas de liquidez</summary>
+          <div class="panel-colapsable-body">
+            <p class="caption">Aparte de las inversiones de arriba — efectivo/deuda de margen en el broker y
+            la Fiducuenta (reserva de impuestos), sin retorno de mercado. Un valor negativo es
+            financiación del broker (deuda), no una pérdida. No cuenta para "Total en inversiones", pero SÍ se
+            descuenta en el XIRR unificado de arriba (sobre capital propio).</p>
+            <div class="metric-row">
+              ${metric("Pesos (COP)", fmtMoneda(cajaPesos))}
+              ${metric(`Dólares → COP (TRM $${trm.toLocaleString("en-US", { maximumFractionDigits: 0 })})`, fmtMoneda(cajaDolaresCop))}
+              ${metric("Total liquidez (COP)", fmtMoneda(cajaTotalCop))}
+            </div>
+          </div>
+        </details>` : ""}
     `;
     if (total > 0) {
       charts.patrimonioPie?.destroy();
@@ -558,11 +570,10 @@ const PaginaInversiones = (() => {
     const serieAportes = serieAcumuladaAportes(aportesMoneda);
     const posicionesMoneda = moneda === "pesos" ? datos.posicionesPesos : datos.posicionesDolares;
 
-    let html = `<h5>📊 Crecimiento y Rentabilidad</h5>`;
+    let html = "";
     if (!serieValor.length && !serieAportes.length) {
       html += `<p class="caption">Todavía no hay historial para graficar — a medida que el GitHub Action
         actualice precios o cargues aportes, esta sección va a ir acumulando la serie en el tiempo.</p>`;
-      div.innerHTML = html;
     } else {
       if (serieValor.length < 2) {
         html += `<p class="caption">El valor de cartera se guarda como una foto cada vez que corre el GitHub
@@ -573,8 +584,16 @@ const PaginaInversiones = (() => {
         <canvas id="chart_crecimiento_${moneda}" height="160"></canvas>
         <div id="rentper_${moneda}"></div>
       `;
-      div.innerHTML = html;
-      renderChartCrecimiento(div.querySelector(`#chart_crecimiento_${moneda}`), serieValor, serieAportes, moneda, unidad);
+    }
+    div.innerHTML = `
+      <details class="panel-colapsable" open>
+        <summary>📊 Crecimiento y Rentabilidad</summary>
+        <div class="panel-colapsable-body" id="crecimiento_body_${moneda}">${html}</div>
+      </details>
+    `;
+    const cuerpo = div.querySelector(`#crecimiento_body_${moneda}`);
+    if (serieValor.length || serieAportes.length) {
+      renderChartCrecimiento(cuerpo.querySelector(`#chart_crecimiento_${moneda}`), serieValor, serieAportes, moneda, unidad);
 
       // Acciones y Fondos de Inversión combinados (todo menos Liquidez) --
       // sigue usándose para el Consolidado y la comparación contra
@@ -584,7 +603,7 @@ const PaginaInversiones = (() => {
       const valorInversion = patrimonioTotal([...sep.acciones, ...sep.fondos]);
 
       renderRentabilidadPersonalizada(
-        div.querySelector(`#rentper_${moneda}`), aportesMoneda, posicionesMoneda, moneda, datos.mercado.trm,
+        cuerpo.querySelector(`#rentper_${moneda}`), aportesMoneda, posicionesMoneda, moneda, datos.mercado.trm,
         datos.historialValorCartera, datos.historialTrm);
 
       // Vista consolidada (solo pesos): acciones + Fiducuenta juntos -- acá
@@ -612,7 +631,7 @@ const PaginaInversiones = (() => {
             metricsConsolidado.push(metric("Rentabilidad anualizada consolidada (XIRR)", `${(xirrConsolidado * 100).toFixed(2)}%`));
           }
           if (metricsConsolidado.length || avisoConsolidado) {
-            div.insertAdjacentHTML("beforeend", `
+            cuerpo.insertAdjacentHTML("beforeend", `
               <h6>🔗 Consolidado (acciones + fondos + Fiducuenta)</h6>
               <p class="caption">Junta el valor y los aportes/retiros de las acciones y fondos de inversión con
               los de Fiducuenta, como si fuera un solo portafolio -- útil para ver el rendimiento total de tu
@@ -633,7 +652,7 @@ const PaginaInversiones = (() => {
       const fmtBench = (v) => (moneda === "dolares" ? fmtUsd(v) : fmtMoneda(v));
       if (bench.valorShadow !== null) {
         const diferencia = valorReal - bench.valorShadow;
-        div.insertAdjacentHTML("beforeend", `
+        cuerpo.insertAdjacentHTML("beforeend", `
           <h6>📈 Comparación contra ${bench.nombre}</h6>
           <p class="caption">Si cada aporte/retiro real (misma fecha, mismo monto) se hubiera puesto en
           ${bench.nombre} en vez de en tu cartera, hoy valdría lo de abajo — calculado por el GitHub Action con
@@ -646,7 +665,7 @@ const PaginaInversiones = (() => {
           </div>
         `);
       } else {
-        div.insertAdjacentHTML("beforeend", `<p class="caption">No pude descargar el histórico de
+        cuerpo.insertAdjacentHTML("beforeend", `<p class="caption">No pude descargar el histórico de
           ${bench.nombre} para comparar — puede ser un corte temporal de Yahoo Finance, o que el símbolo no sea
           el correcto.</p>`);
       }
