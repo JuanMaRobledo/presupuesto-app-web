@@ -108,6 +108,21 @@ GitHub Pages abre esa portada.
   Rendimientos Financieros por mes, total por categoría y gráfico, más
   agregar un ingreso a mano y eliminar una fila puntual — mismo match
   exacto Fecha/Concepto/Categoría/Valor que `eliminar_otro_ingreso()`).
+- 📤 Cargar Extractos — **con escritura**: subí una o varias colillas de
+  pago del Hospital Pablo Tobón Uribe (PDF) o extractos/detalle de
+  transacciones de la cuenta de ahorros (.xlsx, tal como los descargás de
+  Bancolombia) directo desde el navegador — sin backend: el PDF se lee con
+  [pdf.js](https://mozilla.github.io/pdf.js/) y el .xlsx con
+  [SheetJS](https://sheetjs.com/), ambos cargados desde CDN. Categoriza cada
+  movimiento solo (mismas tablas `CONCEPTOS`/`CUENTA_CATEGORY_INGRESO`/
+  `CUENTA_CATEGORY_EGRESO` que Streamlit, puerto en `js/parsers/colillas.js`
+  y `js/parsers/cuenta.js`), detecta aportes a Acciones y Valores/Trii/
+  Plenti/Binance/Hapi/Interactive Brokers y los registra también en
+  Inversiones, y muestra una vista previa de solo lectura (nueva/repetida en
+  esta subida/ya cargada, con la misma deduplicación por fecha+concepto+
+  monto que `marcar_novedad_movimientos()`) antes de escribir nada. Todavía
+  no incluye los extractos de tarjeta de crédito (Visa/Mastercard) — ver
+  pendientes más abajo.
 - 🧾 Facturación Electrónica — **con escritura**: registro año a año, con
   resumen por año, búsqueda por emisor, filtros de año/mes, el link
   "Correo" al mail original en Gmail para las facturas de la carga
@@ -174,6 +189,11 @@ GitHub Pages abre esa portada.
   formularios de escritura sobre el historial, no dependen de Yahoo
   Finance — patrimonio unificado, actualizar precios y Crecimiento y
   Rentabilidad ya están portados, ver más abajo).
+- Cargar extractos de tarjeta de crédito (Visa/Mastercard) — Cargar
+  Extractos ya sube colillas de pago y el extracto de la cuenta de ahorros
+  (ver arriba), pero el tercer uploader de Streamlit (`.xlsx` de tarjeta,
+  con sus dos formatos de Bancolombia y el diccionario `MERCHANT_CATEGORY`)
+  todavía no.
 
 Todo lo demás de la app, incluyendo el gráfico de "Tendencia de los últimos
 meses" de Resumen y Evolución/Año vs. Año de Análisis (las tres leen la hoja

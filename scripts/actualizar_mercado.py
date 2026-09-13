@@ -294,10 +294,19 @@ def main():
         valor_costo = sum(abs(_num(f[2])) * _num(f[3]) for f in filas_pos)
         valor_actual = sum(_num(f[2]) * _num(f[5]) for f in filas_pos)
 
+        # Los aportes/retiros a una plataforma de liquidez (p. ej. Fiducuenta)
+        # tienen que quedar afuera de este cálculo -- son la contraparte de
+        # 'valor_actual' de arriba, que ya excluye esas mismas plataformas
+        # (mismo criterio, mismo error que el "-768%" original si se mezclan
+        # aportes de una fuente con el valor de otra).
+        plataformas_liquidez = {f[0] for f in posiciones_filas[moneda] if f[0] and es_cuenta_liquidez(f[0], f[1])}
+
         aportes_raw = _get_raw(ws, RANGO_APORTES)
         aportes_netos, flujos = 0.0, []
         for r in aportes_raw:
             if not r or not r[0]:
+                continue
+            if len(r) > 1 and r[1] in plataformas_liquidez:
                 continue
             fecha = pd.to_datetime(_serial_to_text(r[0]), dayfirst=True, errors="coerce")
             monto = _num(r[2]) if len(r) > 2 else 0.0

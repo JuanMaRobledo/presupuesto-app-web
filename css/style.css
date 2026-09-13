@@ -177,6 +177,13 @@ h5 { margin: 20px 0 8px; }
 }
 .error { color: var(--accent); }
 
+.card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin: 12px 0;
+}
+
 h6 { margin: 16px 0 4px; font-size: 0.85rem; color: var(--text-muted); text-transform: none; }
 
 details { margin: 12px 0; }
