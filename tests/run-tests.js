@@ -125,7 +125,10 @@ async function clickNav(page, texto) {
   check(!/NaN/.test(await page.locator("#contenido").innerText()), "Resumen no muestra NaN (fechas serial convertidas OK)");
 
   await clickNav(page, "💰 Ingresos");
-  await page.waitForTimeout(300);
+  // Esperar la fila real en vez de un sleep fijo -- bajo CI (más lento que
+  // local) un timeout plano de 300ms puede ganarle al render y dejar la
+  // tabla vacía todavía, produciendo un falso FAIL intermitente.
+  await page.waitForSelector("#cp_detalle table tbody tr td", { timeout: 5000 }).catch(() => {});
   const cpFechaPago = await page.locator("#cp_detalle table tbody tr td").first().innerText().catch(() => "");
   check(/^\d{2}\/\d{2}\/\d{4}$/.test(cpFechaPago), `Colillas: FechaPago serial convertida a dd/mm/yyyy (vi: "${cpFechaPago}")`);
   check(cpFechaPago === "12/07/2027" || cpFechaPago === "27/07/2027", `FechaPago serial 46580 -> texto esperado (vi: "${cpFechaPago}")`);
@@ -134,7 +137,7 @@ async function clickNav(page, texto) {
   // 2) Otros Ingresos: fecha serial convertida en la tabla + agregar + eliminar
   // ---------------------------------------------------------------------
   await page.click('.tab-btn[data-tab="otros"]');
-  await page.waitForTimeout(300);
+  await page.waitForSelector("#oi_tabla tbody tr td", { timeout: 5000 }).catch(() => {});
   const oiFechaCelda = await page.locator("#oi_tabla tbody tr td").first().innerText().catch(() => "");
   check(/^\d{2}\/\d{2}\/\d{4}$/.test(oiFechaCelda), `Otros Ingresos: Fecha serial convertida (vi: "${oiFechaCelda}")`);
 
