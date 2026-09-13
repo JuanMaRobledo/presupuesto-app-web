@@ -119,7 +119,14 @@ GitHub Pages abre esa portada.
   separadas, hay una sección "🔗 Consolidado (acciones + fondos +
   Fiducuenta)" que sí junta el valor y los aportes de todo para quien
   quiera ver el rendimiento total en pesos en un solo número (con su propio
-  aviso si el neto combinado da negativo).
+  aviso si el neto combinado da negativo). "Historial de posiciones y
+  cuenta de margen" ya tiene escritura: "💵 Agregar un dividendo o interés
+  recibido" (con el mismo rechazo de duplicado por fecha/plataforma/
+  activo/tipo que `agregar_historial_inversion()`) y "✏️ Editar o eliminar
+  operaciones del historial" — tabla editable con agregar/quitar fila,
+  igual que `_form_editar_historial()`; como esa hoja crece por filas en
+  vez de ser un bloque reservado, "guardar" limpia todo el rango y lo
+  reescribe desde cero con lo que quede en la tabla.
 - 💰 Ingresos — **completo, con escritura**: sub-tabs Colillas de Pago
   (resumen histórico, tendencia por quincena, y el detalle devengos/
   descuentos tanto general como filtrado a un mes puntual, quincena por
@@ -210,11 +217,10 @@ GitHub Pages abre esa portada.
   últimos 3 con gasto > 0, redondeado al millar más cercano).
 
 ⏳ Todavía no portado (usá la versión de Streamlit mientras tanto):
-- Dentro de Inversiones: importar portafolios, agregar un dividendo/interés
-  manual y editar el historial de operaciones importado del broker (son
-  formularios de escritura sobre el historial, no dependen de Yahoo
-  Finance — patrimonio unificado, actualizar precios y Crecimiento y
-  Rentabilidad ya están portados, ver más abajo).
+- Dentro de Inversiones: importar un reporte de portafolio completo
+  (CSV/XLSX) de un broker — patrimonio unificado, actualizar precios,
+  Crecimiento y Rentabilidad, agregar un dividendo/interés manual y editar
+  el historial de operaciones ya están portados, ver más abajo.
 
 Todo lo demás de la app, incluyendo el gráfico de "Tendencia de los últimos
 meses" de Resumen y Evolución/Año vs. Año de Análisis (las tres leen la hoja

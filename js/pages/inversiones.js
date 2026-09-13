@@ -308,19 +308,20 @@ const PaginaInversiones = (() => {
 
         <div id="inv-historial"></div>
 
-        <div class="aviso">⚠️ Todavía no portado: agregar un dividendo/interés manual y editar el historial de
-        operaciones importado del broker. Usá
+        <div class="aviso">⚠️ Todavía no portado: importar un reporte de portafolio completo (CSV/XLSX) del
+        broker. Usá
         <a href="https://presupuesto-app-jmr.streamlit.app" target="_blank" rel="noopener">la versión de
         Streamlit</a> para eso mientras tanto.</div>
       `;
 
+      const recargar = () => render(container);
       renderGraficos(contenido, datos);
       renderAportesConFiltro(contenido.querySelector("#aportes-pesos"), datos.aportesPesos, "pesos");
       renderAportesConFiltro(contenido.querySelector("#aportes-dolares"), datos.aportesDolares, "dolares");
       renderPatrimonioUnificado(contenido.querySelector("#inv-patrimonio"), datos);
       renderCrecimientoRentabilidad(contenido.querySelector("#inv-crecimiento-pesos"), datos, "pesos");
       renderCrecimientoRentabilidad(contenido.querySelector("#inv-crecimiento-dolares"), datos, "dolares");
-      renderHistorialInversion(contenido.querySelector("#inv-historial"), datos);
+      renderHistorialInversion(contenido.querySelector("#inv-historial"), datos, recargar);
     } catch (err) {
       contenido.innerHTML = `<div class="error">Error cargando el Sheet: ${err.message}</div>`;
       console.error(err);
@@ -834,10 +835,14 @@ const PaginaInversiones = (() => {
     return { hist, pasivos, resumen };
   }
 
-  function renderHistorialInversion(div, datos) {
+  function renderHistorialInversion(div, datos, recargar) {
     div.innerHTML = `<h4>Historial de posiciones y cuenta de margen</h4>`;
     if (!datos.historial.length) {
       div.insertAdjacentHTML("beforeend", "<p>Importá un reporte del broker para ver posiciones cerradas, ventas en corto y coberturas.</p>");
+      const divFormularios = document.createElement("div");
+      div.appendChild(divFormularios);
+      renderFormAgregarDividendo(divFormularios, datos, recargar);
+      renderFormEditarHistorial(divFormularios, datos, recargar);
       return;
     }
     const { hist, pasivos, resumen } = procesarHistorial(datos.historial);
@@ -883,6 +888,197 @@ const PaginaInversiones = (() => {
     renderTablaOperaciones(body.querySelector("#hist_todas_tabla"), todasOrdenadas);
 
     if (pasivos.length) renderDividendosIntereses(body.querySelector("#hist_pasivos"), pasivos);
+
+    const divFormularios = document.createElement("div");
+    div.appendChild(divFormularios);
+    renderFormAgregarDividendo(divFormularios, datos, recargar);
+    renderFormEditarHistorial(divFormularios, datos, recargar);
+  }
+
+  // Puerto de la clave económica de agregar_historial_inversion()
+  // (sheets_backend.py) -- excluye Fuente y ResultadoRealizado a propósito,
+  // para que volver a subir el mismo reporte (o renombrado) no duplique una
+  // operación ya cargada.
+  function claveHistorial(f) {
+    const fechaISO = parseFechaISO(f.Fecha) || String(f.Fecha ?? "").trim();
+    const num = (v) => Math.round(toNumber(v) * 1e8) / 1e8;
+    return [fechaISO, String(f.Plataforma ?? ""), String(f.Activo ?? ""), String(f.Operacion ?? "").toUpperCase(),
+      num(f.Cantidad), num(f.Precio), num(f.Comision)].join("|||");
+  }
+
+  // Puerto de _form_agregar_dividendo() (app_presupuesto.py).
+  function renderFormAgregarDividendo(div, datos, recargar) {
+    const sub = document.createElement("div");
+    const hoy = new Date();
+    sub.innerHTML = `
+      <details>
+        <summary>💵 Agregar un dividendo o interés recibido</summary>
+        <p class="caption">Ingreso pasivo real (no viene de vender nada) — se guarda aparte del resultado
+        realizado de compraventas, en 'Historial de posiciones y cuenta de margen' de arriba.</p>
+        <form id="form_agregar_dividendo">
+          <div class="row">
+            <div class="campo"><label>Fecha</label><br><input type="date" id="div_fecha" required></div>
+            <div class="campo"><label>Tipo</label><br>
+              <select id="div_tipo"><option value="DIVIDEND">Dividendo</option><option value="INTEREST">Interés</option></select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="campo"><label>Plataforma (ej. IBKR, Hapi)</label><br><input type="text" id="div_plataforma" required></div>
+            <div class="campo"><label>Moneda</label><br><select id="div_moneda"><option value="USD">USD</option><option value="COP">COP</option></select></div>
+          </div>
+          <div class="campo"><label>Activo (ticker; dejalo vacío si es interés general de la cuenta)</label><br>
+            <input type="text" id="div_activo"></div>
+          <div class="campo"><label>Valor recibido</label><br><input type="number" step="any" min="0" id="div_valor" required></div>
+          <br><button type="submit" id="div_guardar">💾 Guardar</button>
+        </form>
+        <div class="aviso" id="div_msg" hidden></div>
+      </details>
+    `;
+    div.appendChild(sub);
+    sub.querySelector("#div_fecha").valueAsDate = hoy;
+    sub.querySelector("#form_agregar_dividendo").addEventListener("submit", (ev) =>
+      onGuardarDividendo(ev, sub, datos, recargar));
+  }
+
+  async function onGuardarDividendo(ev, div, datos, recargar) {
+    ev.preventDefault();
+    const msg = div.querySelector("#div_msg");
+    const btn = div.querySelector("#div_guardar");
+    const fecha = div.querySelector("#div_fecha").value;
+    const tipo = div.querySelector("#div_tipo").value;
+    const plataforma = div.querySelector("#div_plataforma").value.trim();
+    const moneda = div.querySelector("#div_moneda").value;
+    const activo = div.querySelector("#div_activo").value.trim() || "(general)";
+    const valor = Number(div.querySelector("#div_valor").value) || 0;
+
+    if (valor <= 0) { mostrarMsgInv(msg, "El valor tiene que ser mayor que cero.", true); return; }
+    if (!plataforma) { mostrarMsgInv(msg, "Escribí la plataforma.", true); return; }
+    if (!fecha) { mostrarMsgInv(msg, "Elegí una fecha.", true); return; }
+
+    const fila = [fecha, plataforma, moneda, activo, tipo, 0, 0, 0, valor, "Manual"];
+    const claveNueva = claveHistorial({ Fecha: fecha, Plataforma: plataforma, Activo: activo, Operacion: tipo, Cantidad: 0, Precio: 0, Comision: 0 });
+    if (datos.historial.some((f) => claveHistorial(f) === claveNueva)) {
+      mostrarMsgInv(msg, "Ya había un registro idéntico (misma fecha/plataforma/activo/tipo/valor) — no se agregó de nuevo.", true);
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Guardando…";
+    try {
+      await SheetsApi.appendRows(RANGOS.historial_inversion, [fila]);
+      const etiqueta = tipo === "DIVIDEND" ? "Dividendo" : "Interés";
+      mostrarMsgInv(msg, `${etiqueta} de ${valor.toLocaleString("en-US", { minimumFractionDigits: 2 })} ${moneda} agregado.`, false);
+      await recargar();
+    } catch (err) {
+      mostrarMsgInv(msg, `No pude guardar: ${err.message}`, true);
+      console.error(err);
+      btn.disabled = false;
+      btn.textContent = "💾 Guardar";
+    }
+  }
+
+  const OPERACIONES_HISTORIAL = ["BUY", "SELL", "SHORT", "COVER", "DIVIDEND", "INTEREST"];
+
+  function filaEditableHistorial(f) {
+    const tr = document.createElement("tr");
+    const fechaISO = f ? (parseFechaISO(f.Fecha) || "") : "";
+    tr.innerHTML = `
+      <td><input type="date" class="hist-fecha" value="${fechaISO}" style="width:100%;"></td>
+      <td><input type="text" class="hist-plataforma" value="${f?.Plataforma ?? ""}" style="width:100%;"></td>
+      <td><select class="hist-moneda">${["COP", "USD"].map((m) => `<option value="${m}" ${f?.Moneda === m ? "selected" : ""}>${m}</option>`).join("")}</select></td>
+      <td><input type="text" class="hist-activo" value="${f?.Activo ?? ""}" style="width:100%;"></td>
+      <td><select class="hist-operacion">${OPERACIONES_HISTORIAL.map((o) => `<option value="${o}" ${f?.Operacion === o ? "selected" : ""}>${o}</option>`).join("")}</select></td>
+      <td><input type="number" step="any" class="hist-cantidad" value="${toNumber(f?.Cantidad)}" style="width:100%;"></td>
+      <td><input type="number" step="any" class="hist-precio" value="${toNumber(f?.Precio)}" style="width:100%;"></td>
+      <td><input type="number" step="any" class="hist-comision" value="${toNumber(f?.Comision)}" style="width:100%;"></td>
+      <td><input type="number" step="any" class="hist-resultado" value="${toNumber(f?.ResultadoRealizado)}" style="width:100%;"></td>
+      <td><input type="text" class="hist-fuente" value="${f?.Fuente ?? ""}" style="width:100%;"></td>
+      <td><button type="button" class="btn-quitar-fila">✕</button></td>
+    `;
+    tr.querySelector(".btn-quitar-fila").addEventListener("click", () => tr.remove());
+    return tr;
+  }
+
+  // Puerto de la parte "guardar" de _form_editar_historial() -- se salta
+  // filas sin Activo o sin Fecha, igual que el filtro de Python.
+  function leerFilasHistorial(tbody) {
+    const filas = [];
+    for (const tr of tbody.querySelectorAll("tr")) {
+      const fecha = tr.querySelector(".hist-fecha").value;
+      const activo = tr.querySelector(".hist-activo").value.trim();
+      if (!fecha || !activo) continue;
+      filas.push([
+        fecha, tr.querySelector(".hist-plataforma").value.trim(), tr.querySelector(".hist-moneda").value, activo,
+        tr.querySelector(".hist-operacion").value, Number(tr.querySelector(".hist-cantidad").value) || 0,
+        Number(tr.querySelector(".hist-precio").value) || 0, Number(tr.querySelector(".hist-comision").value) || 0,
+        Number(tr.querySelector(".hist-resultado").value) || 0, tr.querySelector(".hist-fuente").value.trim(),
+      ]);
+    }
+    return filas;
+  }
+
+  // Puerto de _form_editar_historial() (app_presupuesto.py) -- a diferencia
+  // del resto de Inversiones, esta hoja no es un bloque de filas reservadas
+  // sino que crece por filas (RANGOS.historial_inversion cubre hasta la
+  // 5000), así que "editar o borrar" significa reescribir TODO el rango
+  // desde cero con lo que quede en la tabla al guardar (igual que
+  // set_historial_inversion(), que primero limpia y después escribe).
+  function renderFormEditarHistorial(div, datos, recargar) {
+    const sub = document.createElement("div");
+    sub.innerHTML = `
+      <details>
+        <summary>✏️ Editar o eliminar operaciones del historial (${datos.historial.length})</summary>
+        <p class="caption">Corregí una operación mal importada o borrala con el botón a la derecha de la fila.
+        Operación: BUY (compra), SELL (venta), SHORT (venta en corto), COVER (cobertura de corto), DIVIDEND/
+        INTEREST (dividendo o interés recibido, no afecta cantidad ni cuenta como compraventa). Cambiar
+        cantidad/precio/comisión NO recalcula "Resultado Realizado" solo — ajustalo a mano si corresponde.</p>
+        <div class="tabla-scroll" style="max-height:400px;">
+          <table class="tabla">
+            <thead><tr><th>Fecha</th><th>Plataforma</th><th>Moneda</th><th>Activo</th><th>Operación</th>
+              <th>Cantidad</th><th>Precio</th><th>Comisión</th><th>Resultado Realizado</th><th>Fuente</th><th></th></tr></thead>
+            <tbody id="hist_editor_tbody"></tbody>
+          </table>
+        </div>
+        <button type="button" id="hist_editor_agregar">+ Agregar fila</button>
+        <br><br>
+        <button type="button" id="hist_editor_guardar">💾 Guardar cambios en el historial</button>
+        <div class="aviso" id="hist_editor_msg" hidden></div>
+      </details>
+    `;
+    div.appendChild(sub);
+    const tbody = sub.querySelector("#hist_editor_tbody");
+    for (const f of datos.historial) tbody.appendChild(filaEditableHistorial(f));
+    sub.querySelector("#hist_editor_agregar").addEventListener("click", () => tbody.appendChild(filaEditableHistorial(null)));
+    sub.querySelector("#hist_editor_guardar").addEventListener("click", () => onGuardarHistorial(sub, recargar));
+  }
+
+  async function onGuardarHistorial(div, recargar) {
+    const msg = div.querySelector("#hist_editor_msg");
+    const btn = div.querySelector("#hist_editor_guardar");
+    const filas = leerFilasHistorial(div.querySelector("#hist_editor_tbody"));
+    btn.disabled = true;
+    btn.textContent = "Guardando…";
+    try {
+      await SheetsApi.clearRange(RANGOS.historial_inversion);
+      if (filas.length) {
+        const hoja = RANGOS.historial_inversion.split("!")[0];
+        await SheetsApi.updateRange(`${hoja}!A2:J${filas.length + 1}`, filas);
+      }
+      mostrarMsgInv(msg, `${filas.length} operación(es) guardada(s).`, false);
+      await recargar();
+    } catch (err) {
+      mostrarMsgInv(msg, `No pude guardar: ${err.message}`, true);
+      console.error(err);
+      btn.disabled = false;
+      btn.textContent = "💾 Guardar cambios en el historial";
+    }
+  }
+
+  function mostrarMsgInv(el, texto, esError) {
+    el.hidden = false;
+    el.textContent = texto;
+    el.style.background = esError ? "#f8d7da" : "#d1e7dd";
+    el.style.color = esError ? "#842029" : "#0f5132";
   }
 
   function renderChartsHistorial(div, cierres) {
