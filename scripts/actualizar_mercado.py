@@ -50,7 +50,10 @@ BENCHMARKS = {"pesos": ("ICOLCAP.CL", "COLCAP"), "dolares": ("^GSPC", "S&P 500")
 # Cuentas de efectivo/reserva, no inversiones de mercado -- mismo criterio que
 # esCuentaLiquidez() en js/pages/inversiones.js (ver el comentario ahí para
 # el porqué): ni cotizan en Yahoo ni cuentan para el snapshot de cartera.
-TIPOS_LIQUIDEZ = {"Fondo (liquidez)", "Fiducuenta"}
+# "Fondo (liquidez)" NO va acá -- es el Tipo real de "Trii - Cuenta Dinámica"
+# en el Sheet, que SÍ tiene retorno de mercado (confirmado con el usuario),
+# así que cuenta como inversión para el snapshot, igual que en la web.
+TIPOS_LIQUIDEZ = {"Fiducuenta"}
 
 
 def es_cuenta_liquidez(ticker, tipo):
@@ -84,8 +87,11 @@ def _num(v):
 
 def simbolo_cotizacion(ticker, moneda, tipo=""):
     """Puerto exacto de simbolo_cotizacion() (cuenta_formatos.py) -- traduce
-    una posición guardada al símbolo público que usa Yahoo Finance."""
-    if str(tipo).strip() == "Fondo de Inversión":
+    una posición guardada al símbolo público que usa Yahoo Finance.
+    "Fondo (liquidez)" (p. ej. "Trii - Cuenta Dinámica") tampoco cotiza en
+    Yahoo pese a contar como inversión para el snapshot de cartera (ver
+    TIPOS_LIQUIDEZ) -- no es una acción/ETF/cripto con ticker público."""
+    if str(tipo).strip() in {"Fondo de Inversión", "Fondo (liquidez)"}:
         return None
     nombre = str(ticker or "").strip()
     if not nombre:

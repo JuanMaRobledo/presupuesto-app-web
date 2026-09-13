@@ -21,17 +21,25 @@
 // TODAVÍA NO portado: importar portafolios, _form_agregar_dividendo() y
 // _form_editar_historial() (escritura sobre el historial de operaciones).
 //
-// Cuentas de liquidez (efectivo, margen, fondos de reserva) se separan de
-// las posiciones de inversión de verdad -- ver esCuentaLiquidez() más abajo.
-// Puerto/extensión de la regla "Es efectivo/margen" que ya usa
-// _render_resumen_cartera() (app_presupuesto.py, ticker terminado en
-// " - Efectivo/Margen") + un criterio nuevo por Tipo ("Fondo (liquidez)",
-// "Fiducuenta") para las cuentas de reserva en pesos, que Python no
-// distingue en ningún lado (confirmado leyendo el código fuente: ninguna
-// función de Python filtra estos Tipos). Mezclarlas con inversiones reales
-// distorsionaba el patrimonio unificado y, sobre todo, "Rentabilidad sobre
-// aportes netos"/XIRR/comparación contra benchmark -- esas cuentas no
-// tienen retorno de mercado, solo un saldo que se actualiza a mano.
+// Posiciones se separa en 3 grupos, no 2 -- Acciones, Fondos de Inversión y
+// Liquidez -- para no mezclar cosas con riesgo de mercado distinto ni
+// cuentas sin retorno de mercado. Puerto/extensión de la regla "Es efectivo/
+// margen" que ya usa _render_resumen_cartera() (app_presupuesto.py, ticker
+// terminado en " - Efectivo/Margen"), más criterios nuevos por Tipo que
+// Python no distingue en ningún lado (confirmado leyendo el código fuente):
+// - Liquidez: Tipo "Fiducuenta" (reserva de impuestos) + sufijo "Efectivo/
+//   Margen" (caja/deuda de margen del broker) -- sin retorno de mercado, un
+//   saldo que sube y baja a mano o por depósitos/retiros, no por precio.
+// - Fondos de Inversión: Tipo "Fondo de Inversión" + Tipo "Fondo (liquidez)"
+//   (p. ej. "Trii - Cuenta Dinámica", el fondo de más bajo riesgo del
+//   broker -- SÍ tiene rendimiento de mercado, así que va acá y no en
+//   Liquidez pese al nombre del Tipo, confirmado con el usuario).
+// - Acciones: todo lo demás (Acción/ETF/Cripto/Otro que no sea Efectivo/
+//   Margen).
+// Mezclar Liquidez con inversiones de verdad distorsionaba el patrimonio
+// unificado y, sobre todo, "Rentabilidad sobre aportes netos"/XIRR/
+// comparación contra benchmark. Mezclar Acciones con Fondos de Inversión no
+// rompía ningún cálculo, pero sí volvía ilegible la tabla de Posiciones.
 
 const PaginaInversiones = (() => {
   const APORTE_COLS = ["Fecha", "Plataforma", "MontoTransferido", "Notas"];
@@ -49,9 +57,32 @@ const PaginaInversiones = (() => {
 
   // Tipos que representan un saldo de efectivo/reserva, no una inversión de
   // mercado (ver comentario del encabezado del archivo).
-  const TIPOS_LIQUIDEZ = new Set(["Fondo (liquidez)", "Fiducuenta"]);
+  const TIPOS_LIQUIDEZ = new Set(["Fiducuenta"]);
   function esCuentaLiquidez(f) {
     return TIPOS_LIQUIDEZ.has(String(f.Tipo || "").trim()) || /Efectivo\/Margen$/i.test(String(f.TickerFondo || ""));
+  }
+
+  // Tipos que sí son un fondo de inversión de verdad (con retorno de
+  // mercado), separado de Acciones/ETF/Cripto/Otro -- "Fondo (liquidez)" es
+  // el Tipo real de "Trii - Cuenta Dinámica" en el Sheet, pese al nombre.
+  const TIPOS_FONDO = new Set(["Fondo de Inversión", "Fondo (liquidez)"]);
+  function esFondoInversion(f) {
+    return TIPOS_FONDO.has(String(f.Tipo || "").trim());
+  }
+
+  // Deriva la Plataforma de una posición a partir de su TickerFondo (formato
+  // "{Plataforma} - {Símbolo}", o el nombre completo sin separador para
+  // Fiducuenta) -- Posiciones no tiene columna Plataforma propia, así que
+  // esto es lo único disponible para juntar valor de posiciones con
+  // aportes/retiros de la misma plataforma (ver renderRentabilidadPersonalizada()).
+  // Única abreviatura que no calza 1:1 con el nombre real en Aportes: IBKR.
+  const ABREVIATURA_PLATAFORMA = { IBKR: "Interactive Brokers" };
+  function plataformaDePosicion(f) {
+    const ticker = String(f.TickerFondo || "").trim();
+    const idx = ticker.indexOf(" - ");
+    if (idx === -1) return ticker;
+    const prefijo = ticker.slice(0, idx);
+    return ABREVIATURA_PLATAFORMA[prefijo] || prefijo;
   }
 
   // "Fiducuenta (reserva impuestos)" es Fiducuenta *5601 (puerto de
@@ -65,9 +96,13 @@ const PaginaInversiones = (() => {
   // valor hubiera bajado un peso.
   const PLATAFORMA_FONDO_BANCO = "Fiducuenta (reserva impuestos)";
   function separarPosiciones(posiciones) {
-    const titulos = [], liquidez = [];
-    for (const f of posiciones) (esCuentaLiquidez(f) ? liquidez : titulos).push(f);
-    return { titulos, liquidez };
+    const acciones = [], fondos = [], liquidez = [];
+    for (const f of posiciones) {
+      if (esCuentaLiquidez(f)) liquidez.push(f);
+      else if (esFondoInversion(f)) fondos.push(f);
+      else acciones.push(f);
+    }
+    return { acciones, fondos, liquidez };
   }
 
   // 'Datos de Mercado (Auto)' es una hoja simple de clave/valor (columna A =
@@ -297,13 +332,18 @@ const PaginaInversiones = (() => {
   // Crecimiento y Rentabilidad (puerto de _render_crecimiento_rentabilidad())
   // ---------------------------------------------------------------------
   function renderPatrimonioUnificado(div, datos) {
-    const { titulos: titulosPesos, liquidez: liquidezPesos } = separarPosiciones(datos.posicionesPesos);
-    const { titulos: titulosDolares, liquidez: liquidezDolares } = separarPosiciones(datos.posicionesDolares);
-    const patrimonioPesos = patrimonioTotal(titulosPesos);
-    const patrimonioDolares = patrimonioTotal(titulosDolares);
-    const cajaPesos = patrimonioTotal(liquidezPesos);
-    const cajaDolares = patrimonioTotal(liquidezDolares);
-    const hayLiquidez = liquidezPesos.length > 0 || liquidezDolares.length > 0;
+    const sepPesos = separarPosiciones(datos.posicionesPesos);
+    const sepDolares = separarPosiciones(datos.posicionesDolares);
+    const patrimonioAccionesPesos = patrimonioTotal(sepPesos.acciones);
+    const patrimonioFondosPesos = patrimonioTotal(sepPesos.fondos);
+    const patrimonioAccionesDolares = patrimonioTotal(sepDolares.acciones);
+    const patrimonioFondosDolares = patrimonioTotal(sepDolares.fondos);
+    const patrimonioPesos = patrimonioAccionesPesos + patrimonioFondosPesos;
+    const patrimonioDolares = patrimonioAccionesDolares + patrimonioFondosDolares;
+    const cajaPesos = patrimonioTotal(sepPesos.liquidez);
+    const cajaDolares = patrimonioTotal(sepDolares.liquidez);
+    const hayLiquidez = sepPesos.liquidez.length > 0 || sepDolares.liquidez.length > 0;
+    const hayFondos = sepPesos.fondos.length > 0 || sepDolares.fondos.length > 0;
     const trm = datos.mercado.trm;
     if (trm === null) {
       div.innerHTML = `
@@ -327,6 +367,8 @@ const PaginaInversiones = (() => {
     const total = patrimonioPesos + patrimonioDolaresCop;
     const cajaDolaresCop = cajaDolares * trm;
     const cajaTotalCop = cajaPesos + cajaDolaresCop;
+    const accionesTotalCop = patrimonioAccionesPesos + patrimonioAccionesDolares * trm;
+    const fondosTotalCop = patrimonioFondosPesos + patrimonioFondosDolares * trm;
     div.innerHTML = `
       <h4>🌎 Patrimonio total en inversiones</h4>
       <div class="metric-row">
@@ -334,6 +376,13 @@ const PaginaInversiones = (() => {
         ${metric(`Dólares → COP (TRM $${trm.toLocaleString("en-US", { maximumFractionDigits: 0 })})`, fmtMoneda(patrimonioDolaresCop))}
         ${metric("Total en inversiones (COP)", fmtMoneda(total))}
       </div>
+      ${hayFondos ? `
+        <p class="caption">De lo anterior — Acciones/ETF/Cripto/Otro separado de Fondos de Inversión, ambas
+        monedas convertidas a COP:</p>
+        <div class="metric-row">
+          ${metric("Acciones (COP)", fmtMoneda(accionesTotalCop))}
+          ${metric("Fondos de Inversión (COP)", fmtMoneda(fondosTotalCop))}
+        </div>` : ""}
       ${total > 0 ? `<canvas id="chart_patrimonio_pie" height="220"></canvas>` : ""}
       <p class="caption">TRM $${trm.toLocaleString("en-US", { maximumFractionDigits: 2 })} COP/USD
       (${datos.mercado.trmFecha || "sin fecha"}) — la actualiza un GitHub Action programado (no en vivo desde el
@@ -341,7 +390,7 @@ const PaginaInversiones = (() => {
       ${hayLiquidez ? `
         <h5>💰 Efectivo, margen y cuentas de liquidez</h5>
         <p class="caption">Aparte de las inversiones de arriba — efectivo/deuda de margen en el broker y
-        reservas de liquidez (p. ej. una Fiducuenta), sin retorno de mercado. Un valor negativo es
+        la Fiducuenta (reserva de impuestos), sin retorno de mercado. Un valor negativo es
         financiación del broker (deuda), no una pérdida. No cuenta para "Total en inversiones" ni para las
         métricas de rentabilidad de abajo.</p>
         <div class="metric-row">
@@ -368,6 +417,7 @@ const PaginaInversiones = (() => {
     const serieValor = serieValorCartera(datos.historialValorCartera, moneda);
     const aportesMoneda = moneda === "pesos" ? datos.aportesPesos : datos.aportesDolares;
     const serieAportes = serieAcumuladaAportes(aportesMoneda);
+    const posicionesMoneda = moneda === "pesos" ? datos.posicionesPesos : datos.posicionesDolares;
 
     let html = `<h5>📊 Crecimiento y Rentabilidad</h5>`;
     if (!serieValor.length && !serieAportes.length) {
@@ -382,44 +432,20 @@ const PaginaInversiones = (() => {
       }
       html += `
         <canvas id="chart_crecimiento_${moneda}" height="160"></canvas>
-        <div id="crecimiento_metrics_${moneda}" class="metric-row"></div>
+        <div id="rentper_${moneda}"></div>
       `;
       div.innerHTML = html;
       renderChartCrecimiento(div.querySelector(`#chart_crecimiento_${moneda}`), serieValor, serieAportes, moneda, unidad);
 
-      // Solo aportes/retiros a plataformas de bolsa de verdad (Acciones y
-      // Valores/Trii) -- "Fiducuenta (reserva impuestos)" es una cuenta de
-      // liquidez aparte (ver PLATAFORMA_FONDO_BANCO), así que un retiro ahí
-      // (p. ej. para pagar impuestos) no corresponde a ninguna baja en el
-      // valor de las acciones y no debe restar de esta base ni de su XIRR.
-      // Antes el XIRR sí mezclaba los aportes/retiros de Fiducuenta con el
-      // valor de las acciones (numerador y denominador de fuentes distintas
-      // -- el mismo tipo de error que causó el "-768%" original); esto ya
-      // quedó separado, ver "Consolidado" más abajo para la vista combinada.
-      const aportesInversion = aportesMoneda.filter((f) => f.Plataforma !== PLATAFORMA_FONDO_BANCO);
-      const posiciones = separarPosiciones(moneda === "pesos" ? datos.posicionesPesos : datos.posicionesDolares).titulos;
-      const valorTitulos = patrimonioTotal(posiciones);
+      // Acciones y Fondos de Inversión combinados (todo menos Liquidez) --
+      // sigue usándose para el Consolidado y la comparación contra
+      // benchmark de más abajo. La rentabilidad/XIRR en sí ahora se calcula
+      // con la selección de plataformas de renderRentabilidadPersonalizada().
+      const sep = separarPosiciones(posicionesMoneda);
+      const valorInversion = patrimonioTotal([...sep.acciones, ...sep.fondos]);
 
-      const metricsHtml = [];
-      let avisoRentabilidad = "";
-      if (moneda === "pesos" && serieValor.length) {
-        const serieAportesInversion = serieAcumuladaAportes(aportesInversion);
-        if (serieAportesInversion.length) {
-          const ultimoValor = serieValor[serieValor.length - 1].valor;
-          const ultimoAporte = serieAportesInversion[serieAportesInversion.length - 1].acumulado;
-          const { metricHtml, avisoHtml } = rentabilidadSimple("Rentabilidad sobre aportes netos", ultimoValor, ultimoAporte);
-          metricsHtml.push(metricHtml);
-          avisoRentabilidad = avisoHtml;
-        }
-      }
-      const xirrValor = rentabilidadXirr(aportesInversion, valorTitulos, moneda, datos.mercado.trm);
-      if (xirrValor !== null) {
-        metricsHtml.push(metric(
-          moneda === "pesos" ? "Rentabilidad anualizada (XIRR)" : "Rentabilidad anualizada (XIRR, con TRM de hoy)",
-          `${(xirrValor * 100).toFixed(2)}%`));
-      }
-      div.querySelector(`#crecimiento_metrics_${moneda}`).innerHTML = metricsHtml.join("");
-      if (avisoRentabilidad) div.insertAdjacentHTML("beforeend", avisoRentabilidad);
+      renderRentabilidadPersonalizada(
+        div.querySelector(`#rentper_${moneda}`), aportesMoneda, posicionesMoneda, moneda, datos.mercado.trm);
 
       // Vista consolidada (solo pesos): acciones + Fiducuenta juntos -- acá
       // SÍ se combinan los aportes/retiros de ambas plataformas, pero
@@ -430,7 +456,7 @@ const PaginaInversiones = (() => {
           .find((f) => (f.TickerFondo || "").trim() === PLATAFORMA_FONDO_BANCO);
         if (posicionFondo) {
           const valorFondo = toNumber(posicionFondo.ValorActual);
-          const valorConsolidado = valorTitulos + valorFondo;
+          const valorConsolidado = valorInversion + valorFondo;
           const metricsConsolidado = [];
           let avisoConsolidado = "";
           const serieAportesConsolidados = serieAcumuladaAportes(aportesMoneda);
@@ -447,11 +473,11 @@ const PaginaInversiones = (() => {
           }
           if (metricsConsolidado.length || avisoConsolidado) {
             div.insertAdjacentHTML("beforeend", `
-              <h6>🔗 Consolidado (acciones + Fiducuenta)</h6>
-              <p class="caption">Junta el valor y los aportes/retiros de las acciones con los de Fiducuenta, como
-              si fuera un solo portafolio -- útil para ver el rendimiento total de tu plata en pesos, pero mezcla
-              cosas con riesgo de mercado (acciones) con una reserva de liquidez (Fiducuenta), así que conviene
-              mirar también las métricas separadas de arriba.</p>
+              <h6>🔗 Consolidado (acciones + fondos + Fiducuenta)</h6>
+              <p class="caption">Junta el valor y los aportes/retiros de las acciones y fondos de inversión con
+              los de Fiducuenta, como si fuera un solo portafolio -- útil para ver el rendimiento total de tu
+              plata en pesos, pero mezcla cosas con riesgo de mercado con una reserva de liquidez (Fiducuenta),
+              así que conviene mirar también las métricas separadas de arriba.</p>
               ${metricsConsolidado.length ? `<div class="metric-row">${metricsConsolidado.join("")}</div>` : ""}
               ${avisoConsolidado}
             `);
@@ -462,7 +488,8 @@ const PaginaInversiones = (() => {
 
     const bench = datos.mercado.benchmarks[moneda];
     if (bench && bench.nombre) {
-      const valorReal = patrimonioTotal(separarPosiciones(moneda === "pesos" ? datos.posicionesPesos : datos.posicionesDolares).titulos);
+      const sepBench = separarPosiciones(posicionesMoneda);
+      const valorReal = patrimonioTotal([...sepBench.acciones, ...sepBench.fondos]);
       const fmtBench = (v) => (moneda === "dolares" ? "US$ " + v.toLocaleString("en-US", { minimumFractionDigits: 2 }) : fmtMoneda(v));
       if (bench.valorShadow !== null) {
         const diferencia = valorReal - bench.valorShadow;
@@ -484,6 +511,83 @@ const PaginaInversiones = (() => {
           el correcto.</p>`);
       }
     }
+  }
+
+  // Rentabilidad con selección de plataformas a mano (casillas), en vez de
+  // una combinación fija -- cada aporte/retiro se cuenta completo por la
+  // Plataforma a la que fue destinado (Aportes no tiene columna Tipo de
+  // activo, así que no se puede partir un aporte entre "para acciones" y
+  // "para fondos" dentro de la misma plataforma). El valor de cada
+  // plataforma sí se puede calcular exacto, vía plataformaDePosicion().
+  // Por defecto viene marcado todo menos Fiducuenta (mismo criterio que
+  // tenía la métrica fija anterior), para no cambiar el resultado por
+  // defecto -- desmarcar/marcar plataformas recalcula todo al vuelo, sin
+  // volver a pedirle nada al Sheet.
+  function renderRentabilidadPersonalizada(div, aportesMoneda, posicionesMoneda, moneda, trm) {
+    const posicionesInversion = posicionesMoneda.filter((f) => !esCuentaLiquidez(f));
+    const plataformas = [...new Set([
+      ...aportesMoneda.map((f) => f.Plataforma),
+      ...posicionesInversion.map(plataformaDePosicion),
+    ])].filter(Boolean).sort();
+
+    if (!plataformas.length) { div.innerHTML = ""; return; }
+
+    const claseChk = `chk_plat_${moneda}`;
+    div.innerHTML = `
+      <h6>🎛️ Rentabilidad personalizada</h6>
+      <p class="caption">Elegí qué plataformas juntar para la rentabilidad sobre aportes netos y el XIRR --
+      por defecto viene marcado todo menos Fiducuenta (lo mismo que se mostraba antes). Cada aporte/retiro se
+      cuenta completo por la plataforma a la que fue destinado -- no se puede partir un aporte entre el tipo de
+      activo que compró esa plataforma con esa plata.</p>
+      <div class="checks-row">${plataformas.map((p) => `
+        <label style="margin-right:14px; white-space:nowrap;">
+          <input type="checkbox" class="${claseChk}" value="${p}" ${p === PLATAFORMA_FONDO_BANCO ? "" : "checked"}>
+          ${p}
+        </label>
+      `).join("")}</div>
+      <div id="rentper_metrics_${moneda}" class="metric-row"></div>
+      <div id="rentper_aviso_${moneda}"></div>
+    `;
+
+    const metricsDiv = div.querySelector(`#rentper_metrics_${moneda}`);
+    const avisoDiv = div.querySelector(`#rentper_aviso_${moneda}`);
+
+    function recalcular() {
+      const seleccion = new Set([...div.querySelectorAll(`.${claseChk}:checked`)].map((el) => el.value));
+      const aportesSel = aportesMoneda.filter((f) => seleccion.has(f.Plataforma));
+      const valorSel = posicionesInversion
+        .filter((f) => seleccion.has(plataformaDePosicion(f)))
+        .reduce((s, f) => s + toNumber(f.ValorActual), 0);
+
+      const metricsHtml = [];
+      let avisoHtml = "";
+      // La rentabilidad simple (valor-aportes)/aportes solo tiene sentido en
+      // pesos -- en dólares los aportes se registran en COP transferido
+      // (Monto Transferido (COP)) contra un valor en USD, unidades que no
+      // se pueden restar entre sí sin convertir (mismo motivo que la
+      // versión de Streamlit nunca mostró esta métrica para dólares).
+      if (moneda === "pesos") {
+        const serieSel = serieAcumuladaAportes(aportesSel);
+        if (serieSel.length) {
+          const aportesNetosSel = serieSel[serieSel.length - 1].acumulado;
+          const r = rentabilidadSimple("Rentabilidad sobre aportes netos (selección)", valorSel, aportesNetosSel);
+          if (r.metricHtml) metricsHtml.push(r.metricHtml);
+          avisoHtml = r.avisoHtml;
+        }
+      }
+      const xirrSel = rentabilidadXirr(aportesSel, valorSel, moneda, trm);
+      if (xirrSel !== null) {
+        metricsHtml.push(metric(
+          moneda === "pesos" ? "Rentabilidad anualizada (XIRR, selección)" : "Rentabilidad anualizada (XIRR, selección, con TRM de hoy)",
+          `${(xirrSel * 100).toFixed(2)}%`));
+      }
+      metricsDiv.innerHTML = metricsHtml.length ? metricsHtml.join("")
+        : `<p class="caption">Elegí al menos una plataforma con aportes y valor para calcular.</p>`;
+      avisoDiv.innerHTML = avisoHtml;
+    }
+
+    div.querySelectorAll(`.${claseChk}`).forEach((el) => el.addEventListener("change", recalcular));
+    recalcular();
   }
 
   function renderChartCrecimiento(canvas, serieValor, serieAportes, moneda, unidad) {
@@ -562,7 +666,7 @@ const PaginaInversiones = (() => {
 
   function renderPosiciones(posiciones, moneda, aportes = null) {
     if (!posiciones.length) return `<p>Todavía no hay posiciones cargadas.</p>`;
-    const { titulos, liquidez } = separarPosiciones(posiciones);
+    const { acciones, fondos, liquidez } = separarPosiciones(posiciones);
     const fmtVal = (v) => moneda === "USD" ? "US$ " + toNumber(v).toLocaleString("en-US", { minimumFractionDigits: 2 }) : fmtMoneda(v);
     const tabla = (filas) => `
       <table class="tabla">
@@ -577,20 +681,27 @@ const PaginaInversiones = (() => {
         </tr>`).join("")}</tbody>
       </table>`;
 
-    let html = "";
-    if (!titulos.length) {
-      html += `<p>Todavía no hay posiciones de inversión cargadas.</p>`;
-    } else {
-      const costoTotal = titulos.reduce((s, f) => s + toNumber(f.CostoTotal), 0);
-      const valorTotal = titulos.reduce((s, f) => s + toNumber(f.ValorActual), 0);
-      html += `
+    const seccionGrupo = (titulo, filas, maxHeight) => {
+      if (!filas.length) return "";
+      const costoTotal = filas.reduce((s, f) => s + toNumber(f.CostoTotal), 0);
+      const valorTotal = filas.reduce((s, f) => s + toNumber(f.ValorActual), 0);
+      return `
+        ${titulo ? `<h5>${titulo}</h5>` : ""}
         <div class="metric-row">
           ${metric("Costo Total", fmtVal(costoTotal))}
           ${metric("Valor Actual", fmtVal(valorTotal))}
           ${metric("Ganancia/Pérdida", fmtVal(valorTotal - costoTotal))}
         </div>
-        <div class="tabla-scroll" style="max-height:340px;">${tabla(titulos)}</div>
+        <div class="tabla-scroll" style="max-height:${maxHeight}px;">${tabla(filas)}</div>
       `;
+    };
+
+    let html = "";
+    if (!acciones.length && !fondos.length) {
+      html += `<p>Todavía no hay posiciones de inversión cargadas.</p>`;
+    } else {
+      html += seccionGrupo("📈 Acciones", acciones, 340);
+      html += seccionGrupo("💼 Fondos de Inversión", fondos, 220);
     }
     if (liquidez.length) {
       const valorLiquidez = liquidez.reduce((s, f) => s + toNumber(f.ValorActual), 0);
@@ -601,13 +712,13 @@ const PaginaInversiones = (() => {
         <div class="metric-row">${metric("Valor Actual", fmtVal(valorLiquidez))}</div>
         <div class="tabla-scroll" style="max-height:200px;">${tabla(liquidez)}</div>
       `;
-      // "Fondo de Inversión (banco)": el usuario lo usa como liquidez (plata
-      // disponible para invertir o gastar en cualquier momento), pero sigue
-      // queriendo saber cómo rinde esa plata puntual -- a diferencia de
-      // Cuenta Dinámica/Fiducuenta (sin aportes registrados aparte), esta
-      // plataforma sí tiene su propio historial de aportes/retiros
-      // (PLATAFORMA_FONDO_BANCO), así que se puede calcular una rentabilidad
-      // propia con la misma fórmula/guarda que las acciones, sin mezclarla.
+      // Fiducuenta: el usuario la usa como liquidez (plata disponible para
+      // pagar impuestos), pero sigue queriendo saber cómo rinde esa plata
+      // puntual -- a diferencia de Cuenta Dinámica (sin aportes registrados
+      // aparte, ver Fondos de Inversión arriba), Fiducuenta sí tiene su
+      // propio historial de aportes/retiros (PLATAFORMA_FONDO_BANCO), así
+      // que se puede calcular una rentabilidad propia con la misma fórmula/
+      // guarda que las acciones, sin mezclarla con nada más.
       if (aportes) {
         const posicionFondo = liquidez.find((f) => (f.TickerFondo || "").trim() === PLATAFORMA_FONDO_BANCO);
         if (posicionFondo) {

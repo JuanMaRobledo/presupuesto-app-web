@@ -72,31 +72,39 @@ GitHub Pages abre esa portada.
   un GitHub Action programado (ver "Actualizar precios de mercado (Yahoo
   Finance)" más abajo) y esta página solo lee lo que ese Action ya dejó
   escrito en el Sheet, con degradación explícita si todavía no corrió ni
-  una vez. Las cuentas de efectivo/margen/reserva (Tipo "Fondo (liquidez)"
-  o "Fiducuenta", o un ticker terminado en " - Efectivo/Margen" — sin
-  retorno de mercado) se muestran separadas de las posiciones de inversión
-  de verdad en todos lados: Posiciones, Patrimonio unificado, y no cuentan
-  para XIRR/Rentabilidad/Comparación contra benchmark. "Rentabilidad sobre
-  aportes netos" (pesos) ignora los aportes/retiros a la plataforma
-  "Fiducuenta (reserva impuestos)" (Fiducuenta *5601, un fondo de inversión
-  colectiva de Bancolombia usado como reserva de liquidez, no una posición
-  de bolsa), así que un retiro ahí (p. ej. para pagar impuestos) no
-  corresponde a ningún cambio en las acciones — y de todos modos se oculta
-  (con un aviso explicando por qué) si algún día los retiros de bolsa
-  superan los depósitos de bolsa, para no dividir por un neto negativo y
-  mostrar un porcentaje sin sentido (el caso real que motivó esto daba
-  "-768%"). Esa cuenta tiene su propia fila en Posiciones (Tipo
-  "Fiducuenta", en el bloque de liquidez) y su propia "Rentabilidad de
-  Fiducuenta (reserva impuestos)" (más su XIRR, que sigue dando un número
-  interpretable aunque los retiros superen los aportes, a diferencia de la
-  rentabilidad simple) — calculada solo con los aportes/retiros de esa
-  plataforma (reconstruidos y verificados mes a mes contra los extractos
-  oficiales de Bancolombia de nov-2024 a ago-2026), sin mezclarla con la de
-  las acciones ni con el patrimonio de inversiones. Además de las métricas
-  separadas, hay una sección "🔗 Consolidado (acciones + Fiducuenta)" que sí
-  junta el valor y los aportes de ambas para quien quiera ver el
-  rendimiento total en pesos en un solo número (con su propio aviso si el
-  neto combinado da negativo).
+  una vez. Posiciones se separa en 3 grupos, no solo inversión/liquidez:
+  **Acciones** (Tipo Acción/ETF/Cripto/Otro), **Fondos de Inversión** (Tipo
+  "Fondo de Inversión" o "Fondo (liquidez)" — p. ej. "Trii - Cuenta
+  Dinámica", que SÍ tiene retorno de mercado pese al nombre del Tipo) y
+  **Efectivo, margen y cuentas de liquidez** (Tipo "Fiducuenta" o un ticker
+  terminado en " - Efectivo/Margen" — sin retorno de mercado). Los 3 se
+  muestran separados en todos lados: Posiciones (una tabla por grupo, con
+  sus propias métricas de Costo/Valor/Ganancia), Patrimonio unificado
+  (desglose Acciones vs. Fondos de Inversión en COP, más el bloque aparte
+  de liquidez), y Liquidez no cuenta para XIRR/Rentabilidad/Comparación
+  contra benchmark. "🎛️ Rentabilidad personalizada" reemplaza la vieja
+  métrica fija: casillas para elegir a mano qué plataformas juntar (cada
+  aporte/retiro se cuenta completo por la plataforma a la que fue
+  destinado — un aporte no se puede partir entre el tipo de activo que
+  compró esa plataforma con esa plata) y recalcula "Rentabilidad sobre
+  aportes netos"/XIRR al vuelo, sin volver a pedirle nada al Sheet; por
+  defecto viene marcado todo menos "Fiducuenta (reserva impuestos)" (mismo
+  resultado que antes). Como siempre, se oculta el % (con un aviso
+  explicando por qué) si los retiros de la selección superan los
+  depósitos, para no dividir por un neto negativo y mostrar un porcentaje
+  sin sentido (el caso real que motivó esto daba "-768%"). Fiducuenta
+  (Fiducuenta *5601, un fondo de inversión colectiva de Bancolombia usado
+  como reserva de impuestos, no una posición de bolsa) tiene además su
+  propia "Rentabilidad de Fiducuenta (reserva impuestos)" fija (más su
+  XIRR, que sigue dando un número interpretable aunque los retiros superen
+  los aportes, a diferencia de la rentabilidad simple) — calculada solo con
+  los aportes/retiros de esa plataforma (reconstruidos y verificados mes a
+  mes contra los extractos oficiales de Bancolombia de nov-2024 a
+  ago-2026), en el bloque de liquidez de Posiciones. Además de las métricas
+  separadas, hay una sección "🔗 Consolidado (acciones + fondos +
+  Fiducuenta)" que sí junta el valor y los aportes de todo para quien
+  quiera ver el rendimiento total en pesos en un solo número (con su propio
+  aviso si el neto combinado da negativo).
 - 💰 Ingresos — **completo, con escritura**: sub-tabs Colillas de Pago
   (resumen histórico, tendencia por quincena, y el detalle devengos/
   descuentos tanto general como filtrado a un mes puntual, quincena por

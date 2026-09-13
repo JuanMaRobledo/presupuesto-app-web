@@ -184,6 +184,8 @@ h5 { margin: 20px 0 8px; }
   margin: 12px 0;
 }
 
+.checks-row { display: flex; gap: 8px 14px; flex-wrap: wrap; margin: 8px 0; }
+
 h6 { margin: 16px 0 4px; font-size: 0.85rem; color: var(--text-muted); text-transform: none; }
 
 details { margin: 12px 0; }
