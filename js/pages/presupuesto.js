@@ -144,6 +144,20 @@ const PaginaPresupuesto = (() => {
     try {
       const p = await cargarPresupuesto(mesPres);
 
+      // Aviso visual de "casi" o "ya te pasaste" del presupuesto: rojo si el
+      // gasto real ya superó la meta, naranja si lleva 90%+ usado -- antes
+      // solo mostraba "$X disponible" sin resaltar cuándo eso era negativo
+      // o estaba a punto de serlo, así que había que leer el número con
+      // atención para notarlo (mismo criterio que Streamlit).
+      const avisoDisponibleHTML = (meta, real) => {
+        if (meta <= 0) return "—";
+        const disponible = meta - real;
+        const pctUsado = (real / meta) * 100;
+        if (disponible < 0) return `<span style="color:#dc2626;">⚠️ ${fmtMoneda(-disponible)} de más</span>`;
+        if (pctUsado >= 90) return `<span style="color:#b45309;">🟡 ${fmtMoneda(disponible)} disponible (${pctUsado.toFixed(0)}% usado)</span>`;
+        return `${fmtMoneda(disponible)} disponible`;
+      };
+
       const filaHtml = (item, campoNombre, etiqueta, prefijoId) => `
         <div class="metric-row" style="align-items:center;">
           <div style="flex:2;min-width:160px;">${item.categoria}</div>
@@ -154,7 +168,7 @@ const PaginaPresupuesto = (() => {
               id="${prefijoId}_${item.fila}" value="${item.presupuesto}">
           </div>
           <div style="flex:1;min-width:120px;" class="caption" id="disp_${item.fila}">
-            ${item.presupuesto > 0 ? fmtMoneda(item.presupuesto - item[campoNombre]) + " disponible" : "—"}
+            ${avisoDisponibleHTML(item.presupuesto, item[campoNombre])}
           </div>
         </div>`;
 
@@ -181,7 +195,7 @@ const PaginaPresupuesto = (() => {
         const base = Number(input.dataset.base);
         const meta = Number(input.value) || 0;
         const dispEl = contenido.querySelector(`#disp_${fila}`);
-        dispEl.textContent = meta > 0 ? `${fmtMoneda(meta - base)} disponible` : "—";
+        dispEl.innerHTML = avisoDisponibleHTML(meta, base);
       }
 
       contenido.querySelectorAll(".input-meta").forEach((input) => {
