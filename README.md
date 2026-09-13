@@ -22,6 +22,15 @@ GitHub Pages abre esa portada.
 
 ✅ Portado:
 - Login con Google (OAuth del lado del navegador, sin backend)
+- 📲 Instalable como app propia (PWA) — en computador, Chrome/Edge ofrecen
+  "Instalar Presupuesto App" (ícono propio, ventana propia sin barra del
+  navegador — la definición de "app de escritorio autónoma" que da un PWA,
+  sin necesitar un proyecto de Electron/Tauri aparte); en celular, "Agregar
+  a pantalla de inicio" hace lo mismo (Android e iOS, cada uno con su
+  splash/ícono). `manifest.json` + `sw.js` (service worker mínimo, cachea
+  el shell propio con network-first + fallback a caché — los DATOS siempre
+  van en vivo a la API de Sheets, nunca se cachean) + `icons/` — nada de
+  esto pide un scope de Google nuevo.
 - 💾 Copia de seguridad — botón siempre visible en la barra lateral (no hace
   falta entrar a ninguna página puntual): descarga TODAS las hojas del
   Sheet, tal como están hoy, en un solo archivo `.xlsx` armado del lado del

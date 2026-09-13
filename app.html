@@ -4,8 +4,20 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>💰 Presupuesto App (web)</title>
-  <link rel="icon" href="data:," />
+  <link rel="icon" href="icons/icon-192.png" />
   <link rel="stylesheet" href="css/style.css" />
+
+  <!-- PWA: instalable como app propia en computador (Chrome/Edge → "Instalar
+       Presupuesto App") y en celular ("Agregar a pantalla de inicio"), con
+       ícono y splash screen propios en vez de abrir como una pestaña más
+       del navegador. Ver manifest.json y sw.js (service worker). -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#1d4ed8" />
+  <!-- iOS/Safari no lee manifest.json para esto -- usa sus propias meta/link. -->
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Presupuesto" />
 </head>
 <body>
   <div id="pantalla-login">
@@ -62,5 +74,10 @@
   <script src="js/pages/declaraciones.js"></script>
   <script src="js/pages/cargar.js"></script>
   <script src="js/app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+    }
+  </script>
 </body>
 </html>
