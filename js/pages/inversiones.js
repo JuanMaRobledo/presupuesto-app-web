@@ -324,8 +324,8 @@ const PaginaInversiones = (() => {
       renderCrecimientoRentabilidad(contenido.querySelector("#inv-crecimiento-dolares"), datos, "dolares");
       renderHistorialInversion(contenido.querySelector("#inv-historial"), datos, recargar);
       ImportarPortafolio.render(contenido.querySelector("#inv-importar"), datos, recargar);
-      renderEditorPosiciones(contenido.querySelector("#inv-editor-pos-pesos"), datos.posicionesPesos, "pesos", recargar);
-      renderEditorPosiciones(contenido.querySelector("#inv-editor-pos-dolares"), datos.posicionesDolares, "dolares", recargar);
+      renderEditorPosicionesConFiltro(contenido.querySelector("#inv-editor-pos-pesos"), datos.posicionesPesos, "pesos", recargar);
+      renderEditorPosicionesConFiltro(contenido.querySelector("#inv-editor-pos-dolares"), datos.posicionesDolares, "dolares", recargar);
     } catch (err) {
       contenido.innerHTML = `<div class="error">Error cargando el Sheet: ${err.message}</div>`;
       console.error(err);
@@ -850,7 +850,8 @@ const PaginaInversiones = (() => {
   // set_posiciones_inversion() que ya usa "Importar portafolios" al
   // combinar posiciones nuevas con las existentes.
   // ---------------------------------------------------------------------
-  const TIPOS_POSICION = ["Acción", "ETF", "Fondo de Inversión", "Fondo (liquidez)", "Cripto", "Fiducuenta", "Otro"];
+  const TIPOS_POSICION = ["Acción", "ETF", "Fondo de Inversión", "Fondo (liquidez)", "Cripto", "Otro"];
+  const TIPOS_POSICION_FIDUCUENTA = ["Fiducuenta"];
 
   function actualizarFilaPosicion(tr) {
     const cantidad = Number(tr.querySelector(".pos-cantidad").value) || 0;
@@ -863,11 +864,12 @@ const PaginaInversiones = (() => {
     tr.querySelector(".pos-ganancia").textContent = fmtMoneda(valorActual - costoTotal);
   }
 
-  function filaEditablePosicion(f) {
+  function filaEditablePosicion(f, esFiducuenta) {
     const tr = document.createElement("tr");
+    const tipos = esFiducuenta ? TIPOS_POSICION_FIDUCUENTA : TIPOS_POSICION;
     tr.innerHTML = `
       <td><input type="text" class="pos-ticker" value="${f?.TickerFondo ?? ""}" style="width:100%;"></td>
-      <td><select class="pos-tipo">${TIPOS_POSICION.map((t) => `<option value="${t}" ${f?.Tipo === t ? "selected" : ""}>${t}</option>`).join("")}</select></td>
+      <td><select class="pos-tipo">${tipos.map((t) => `<option value="${t}" ${f?.Tipo === t ? "selected" : ""}>${t}</option>`).join("")}</select></td>
       <td><input type="number" step="any" class="pos-cantidad" value="${toNumber(f?.Cantidad)}" style="width:100%;"></td>
       <td><input type="number" step="any" class="pos-precio-compra" value="${toNumber(f?.PrecioCompra)}" style="width:100%;"></td>
       <td><input type="number" step="any" class="pos-precio-actual" value="${toNumber(f?.PrecioActual)}" style="width:100%;"></td>
@@ -899,41 +901,93 @@ const PaginaInversiones = (() => {
     return filas;
   }
 
-  function renderEditorPosiciones(div, posiciones, moneda, recargar) {
+  const esFiducuentaTipo = (f) => String(f?.Tipo || "").trim() === "Fiducuenta";
+
+  // Fiducuenta vive en su propio editor, aparte de Acciones y Fondos --
+  // mismo motivo que separarPosiciones()/renderAportesConFiltro(): mezclar
+  // un renglón de Fiducuenta entre las posiciones de verdad lo volvía fácil
+  // de confundir con una inversión de mercado. Solo aplica a pesos --
+  // Fiducuenta nunca tiene posiciones en dólares (ver _form_agregar_aporte
+  // del lado Python: la opción "Fiducuenta (reserva impuestos)" ni existe
+  // para dólares).
+  function renderEditorPosicionesConFiltro(div, posiciones, moneda, recargar) {
+    if (moneda !== "pesos") {
+      div.innerHTML = `<div id="pos_editor_cont_${moneda}"></div>`;
+      renderEditorPosiciones(div.querySelector(`#pos_editor_cont_${moneda}`), posiciones, moneda, `${moneda}`, recargar, false, false);
+      return;
+    }
+    div.innerHTML = `
+      <div id="pos_editor_cont_${moneda}_inv"></div>
+      <div id="pos_editor_cont_${moneda}_fid"></div>
+    `;
+    renderEditorPosiciones(div.querySelector(`#pos_editor_cont_${moneda}_inv`),
+      posiciones.filter((f) => !esFiducuentaTipo(f)), moneda, `${moneda}_inv`, recargar, false, true);
+    renderEditorPosiciones(div.querySelector(`#pos_editor_cont_${moneda}_fid`),
+      posiciones.filter(esFiducuentaTipo), moneda, `${moneda}_fid`, recargar, true, true);
+  }
+
+  // 'idSufijo': único por editor (para los ids del DOM), puede diferir de
+  // 'moneda' (la moneda REAL, la que se manda a guardarPosicionesInversion)
+  // cuando hay 2 editores para la misma moneda (pesos: Acciones + Fiducuenta).
+  // 'dividida': si hay otro editor mostrando la mitad complementaria de esta
+  // misma moneda -- si es así, guardar tiene que traer esa otra mitad fresca
+  // del Sheet y mandarla junto (guardarPosicionesInversion() SOBREESCRIBE
+  // todo el bloque de la moneda, no solo lo que le pasás).
+  function renderEditorPosiciones(div, posiciones, moneda, idSufijo, recargar, esFiducuenta, dividida) {
     div.innerHTML = `
       <details>
-        <summary>✏️ Editar posiciones a mano (${posiciones.length})</summary>
+        <summary>✏️ Editar ${esFiducuenta ? "Fiducuenta" : "posiciones"} a mano (${posiciones.length})</summary>
         <p class="caption">Corregí Cantidad/Precio Compra/Precio Actual, agregá o quitá una posición a mano —
         Costo Total/Valor Actual/Ganancia-Pérdida se recalculan solos (son fórmulas del Sheet, nunca se
         escriben acá). Útil para una corrección puntual sin pasar por "📥 Importar portafolios" completo.
-        Guardar reemplaza TODAS las posiciones de esta moneda con lo que quede en la tabla.</p>
+        Guardar reemplaza ${dividida ? "esta tabla" : "TODAS las posiciones de esta moneda"} con lo que quede acá${dividida ? " (la otra tabla no se toca)" : ""}.</p>
         <div class="tabla-scroll" style="max-height:400px;">
           <table class="tabla">
             <thead><tr><th>Ticker / Fondo</th><th>Tipo</th><th>Cantidad</th><th>Precio Compra Prom.</th>
               <th>Precio Actual</th><th>Costo Total</th><th>Valor Actual</th><th>Ganancia/Pérdida</th><th></th></tr></thead>
-            <tbody id="pos_editor_tbody_${moneda}"></tbody>
+            <tbody id="pos_editor_tbody_${idSufijo}"></tbody>
           </table>
         </div>
-        <button type="button" id="pos_editor_agregar_${moneda}">+ Agregar posición</button>
+        <button type="button" id="pos_editor_agregar_${idSufijo}">+ Agregar posición</button>
         <br><br>
-        <button type="button" id="pos_editor_guardar_${moneda}">💾 Guardar posiciones</button>
-        <div class="aviso" id="pos_editor_msg_${moneda}" hidden></div>
+        <button type="button" id="pos_editor_guardar_${idSufijo}">💾 Guardar posiciones</button>
+        <div class="aviso" id="pos_editor_msg_${idSufijo}" hidden></div>
       </details>
     `;
-    const tbody = div.querySelector(`#pos_editor_tbody_${moneda}`);
-    for (const f of posiciones) tbody.appendChild(filaEditablePosicion(f));
-    div.querySelector(`#pos_editor_agregar_${moneda}`).addEventListener("click", () => tbody.appendChild(filaEditablePosicion(null)));
-    div.querySelector(`#pos_editor_guardar_${moneda}`).addEventListener("click", () => onGuardarPosiciones(div, moneda, recargar));
+    const tbody = div.querySelector(`#pos_editor_tbody_${idSufijo}`);
+    for (const f of posiciones) tbody.appendChild(filaEditablePosicion(f, esFiducuenta));
+    div.querySelector(`#pos_editor_agregar_${idSufijo}`).addEventListener("click", () => tbody.appendChild(filaEditablePosicion(null, esFiducuenta)));
+    div.querySelector(`#pos_editor_guardar_${idSufijo}`).addEventListener("click", () => onGuardarPosiciones(div, moneda, idSufijo, recargar, esFiducuenta, dividida));
   }
 
-  async function onGuardarPosiciones(div, moneda, recargar) {
-    const msg = div.querySelector(`#pos_editor_msg_${moneda}`);
-    const btn = div.querySelector(`#pos_editor_guardar_${moneda}`);
-    const filas = leerFilasPosiciones(div.querySelector(`#pos_editor_tbody_${moneda}`));
+  // Lee del Sheet (fresco, no lo ya cargado en memoria -- puede haber
+  // cambiado si el otro editor guardó primero) la mitad complementaria a la
+  // que se acaba de editar, ya en el formato que espera guardarPosicionesInversion().
+  async function otraMitadPosiciones(moneda, esFiducuenta) {
+    const clave = moneda === "pesos" ? "posiciones_pesos" : "posiciones_dolares";
+    const raw = await SheetsApi.batchGet([clave]);
+    const todas = filasAObjetos(raw[clave], POSICION_COLS);
+    const otra = todas.filter((f) => (esFiducuenta ? !esFiducuentaTipo(f) : esFiducuentaTipo(f)));
+    return otra
+      .filter((f) => String(f.TickerFondo || "").trim())
+      .map((f) => ({
+        ticker: String(f.TickerFondo).trim(), tipo: f.Tipo || "",
+        cantidad: toNumber(f.Cantidad), precio_compra: toNumber(f.PrecioCompra), precio_actual: toNumber(f.PrecioActual),
+      }));
+  }
+
+  async function onGuardarPosiciones(div, moneda, idSufijo, recargar, esFiducuenta, dividida) {
+    const msg = div.querySelector(`#pos_editor_msg_${idSufijo}`);
+    const btn = div.querySelector(`#pos_editor_guardar_${idSufijo}`);
+    const filas = leerFilasPosiciones(div.querySelector(`#pos_editor_tbody_${idSufijo}`));
     btn.disabled = true;
     btn.textContent = "Guardando…";
     try {
-      await ImportarPortafolio.guardarPosicionesInversion(moneda, filas);
+      const filasCompletas = dividida
+        ? (esFiducuenta ? [...await otraMitadPosiciones(moneda, esFiducuenta), ...filas]
+                        : [...filas, ...await otraMitadPosiciones(moneda, esFiducuenta)])
+        : filas;
+      await ImportarPortafolio.guardarPosicionesInversion(moneda, filasCompletas);
       mostrarMsgInv(msg, `${filas.length} posición(es) guardadas.`, false);
       await recargar();
     } catch (err) {
