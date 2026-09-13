@@ -153,7 +153,15 @@ GitHub Pages abre esa portada.
   extracto de ejemplo para validar un parser hecho a mano el riesgo de
   reconstruir mal una cantidad/precio y guardar un monto financiero
   incorrecto es demasiado alto — para ese caso puntual seguí usando la
-  versión de Streamlit.
+  versión de Streamlit. Además, "✏️ Editar posiciones a mano" (dentro de
+  cada pestaña Pesos/Dólares) es una tabla editable — Ticker/Fondo, Tipo,
+  Cantidad, Precio Compra Promedio, Precio Actual, con Costo Total/Valor
+  Actual/Ganancia-Pérdida recalculados en vivo del lado del cliente para
+  mostrarlos mientras se edita (son fórmulas del Sheet, nunca se escriben)
+  — agregar/quitar fila con un botón, mismo puerto de
+  `set_posiciones_inversion()` que ya usa "Importar portafolios" al
+  combinar posiciones nuevas con las existentes: "Guardar" reemplaza TODAS
+  las posiciones de esa moneda con lo que quede en la tabla.
 - 💰 Ingresos — **completo, con escritura**: sub-tabs Colillas de Pago
   (resumen histórico, tendencia por quincena, y el detalle devengos/
   descuentos tanto general como filtrado a un mes puntual, quincena por
@@ -299,10 +307,6 @@ GitHub Pages abre esa portada.
   Finance por aporte, que un sitio estático no puede descargar (CORS) y el
   GitHub Action de precios todavía no guarda en el Sheet. El resto del
   informe sí está portado, ver más arriba.
-- Un editor manual de Posiciones (Streamlit tiene una tabla editable para
-  corregir Ticker/Tipo/Cantidad/Precio a mano) — hoy las posiciones en la
-  web solo se cargan importando CSV (📥 Importar portafolios, dentro de
-  Inversiones) o vía el GitHub Action de precios.
 
 Todo lo demás de la app, incluyendo el gráfico de "Tendencia de los últimos
 meses" de Resumen y Evolución/Año vs. Año de Análisis (las tres leen la hoja

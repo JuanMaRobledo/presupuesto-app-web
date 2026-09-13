@@ -302,10 +302,12 @@ const PaginaInversiones = (() => {
 
         <h4>Posiciones — Pesos</h4>
         ${renderPosiciones(datos.posicionesPesos, "COP", datos.aportesPesos)}
+        <div id="inv-editor-pos-pesos"></div>
         <div id="inv-crecimiento-pesos"></div>
 
         <h4>Posiciones — Dólares</h4>
         ${renderPosiciones(datos.posicionesDolares, "USD")}
+        <div id="inv-editor-pos-dolares"></div>
         <div id="inv-crecimiento-dolares"></div>
 
         <div id="inv-historial"></div>
@@ -322,6 +324,8 @@ const PaginaInversiones = (() => {
       renderCrecimientoRentabilidad(contenido.querySelector("#inv-crecimiento-dolares"), datos, "dolares");
       renderHistorialInversion(contenido.querySelector("#inv-historial"), datos, recargar);
       ImportarPortafolio.render(contenido.querySelector("#inv-importar"), datos, recargar);
+      renderEditorPosiciones(contenido.querySelector("#inv-editor-pos-pesos"), datos.posicionesPesos, "pesos", recargar);
+      renderEditorPosiciones(contenido.querySelector("#inv-editor-pos-dolares"), datos.posicionesDolares, "dolares", recargar);
     } catch (err) {
       contenido.innerHTML = `<div class="error">Error cargando el Sheet: ${err.message}</div>`;
       console.error(err);
@@ -835,6 +839,109 @@ const PaginaInversiones = (() => {
       }
     }
     return html;
+  }
+
+  // ---------------------------------------------------------------------
+  // Editor manual de Posiciones -- puerto de _form_posiciones_inversion()
+  // (app_presupuesto.py). Nunca toca Costo Total/Valor Actual/Ganancia-
+  // Pérdida (fórmulas del Sheet, columnas E/G/H): se recalculan solo en el
+  // navegador para mostrarlos mientras se edita, y se guarda vía
+  // ImportarPortafolio.guardarPosicionesInversion() -- mismo puerto de
+  // set_posiciones_inversion() que ya usa "Importar portafolios" al
+  // combinar posiciones nuevas con las existentes.
+  // ---------------------------------------------------------------------
+  const TIPOS_POSICION = ["Acción", "ETF", "Fondo de Inversión", "Fondo (liquidez)", "Cripto", "Fiducuenta", "Otro"];
+
+  function actualizarFilaPosicion(tr) {
+    const cantidad = Number(tr.querySelector(".pos-cantidad").value) || 0;
+    const precioCompra = Number(tr.querySelector(".pos-precio-compra").value) || 0;
+    const precioActual = Number(tr.querySelector(".pos-precio-actual").value) || 0;
+    const costoTotal = cantidad * precioCompra;
+    const valorActual = cantidad * precioActual;
+    tr.querySelector(".pos-costo-total").textContent = fmtMoneda(costoTotal);
+    tr.querySelector(".pos-valor-actual").textContent = fmtMoneda(valorActual);
+    tr.querySelector(".pos-ganancia").textContent = fmtMoneda(valorActual - costoTotal);
+  }
+
+  function filaEditablePosicion(f) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td><input type="text" class="pos-ticker" value="${f?.TickerFondo ?? ""}" style="width:100%;"></td>
+      <td><select class="pos-tipo">${TIPOS_POSICION.map((t) => `<option value="${t}" ${f?.Tipo === t ? "selected" : ""}>${t}</option>`).join("")}</select></td>
+      <td><input type="number" step="any" class="pos-cantidad" value="${toNumber(f?.Cantidad)}" style="width:100%;"></td>
+      <td><input type="number" step="any" class="pos-precio-compra" value="${toNumber(f?.PrecioCompra)}" style="width:100%;"></td>
+      <td><input type="number" step="any" class="pos-precio-actual" value="${toNumber(f?.PrecioActual)}" style="width:100%;"></td>
+      <td class="pos-costo-total"></td>
+      <td class="pos-valor-actual"></td>
+      <td class="pos-ganancia"></td>
+      <td><button type="button" class="btn-quitar-fila">✕</button></td>
+    `;
+    tr.querySelector(".btn-quitar-fila").addEventListener("click", () => tr.remove());
+    ["pos-cantidad", "pos-precio-compra", "pos-precio-actual"].forEach((clase) => {
+      tr.querySelector(`.${clase}`).addEventListener("input", () => actualizarFilaPosicion(tr));
+    });
+    actualizarFilaPosicion(tr);
+    return tr;
+  }
+
+  function leerFilasPosiciones(tbody) {
+    const filas = [];
+    for (const tr of tbody.querySelectorAll("tr")) {
+      const ticker = tr.querySelector(".pos-ticker").value.trim();
+      if (!ticker) continue;
+      filas.push({
+        ticker, tipo: tr.querySelector(".pos-tipo").value,
+        cantidad: Number(tr.querySelector(".pos-cantidad").value) || 0,
+        precio_compra: Number(tr.querySelector(".pos-precio-compra").value) || 0,
+        precio_actual: Number(tr.querySelector(".pos-precio-actual").value) || 0,
+      });
+    }
+    return filas;
+  }
+
+  function renderEditorPosiciones(div, posiciones, moneda, recargar) {
+    div.innerHTML = `
+      <details>
+        <summary>✏️ Editar posiciones a mano (${posiciones.length})</summary>
+        <p class="caption">Corregí Cantidad/Precio Compra/Precio Actual, agregá o quitá una posición a mano —
+        Costo Total/Valor Actual/Ganancia-Pérdida se recalculan solos (son fórmulas del Sheet, nunca se
+        escriben acá). Útil para una corrección puntual sin pasar por "📥 Importar portafolios" completo.
+        Guardar reemplaza TODAS las posiciones de esta moneda con lo que quede en la tabla.</p>
+        <div class="tabla-scroll" style="max-height:400px;">
+          <table class="tabla">
+            <thead><tr><th>Ticker / Fondo</th><th>Tipo</th><th>Cantidad</th><th>Precio Compra Prom.</th>
+              <th>Precio Actual</th><th>Costo Total</th><th>Valor Actual</th><th>Ganancia/Pérdida</th><th></th></tr></thead>
+            <tbody id="pos_editor_tbody_${moneda}"></tbody>
+          </table>
+        </div>
+        <button type="button" id="pos_editor_agregar_${moneda}">+ Agregar posición</button>
+        <br><br>
+        <button type="button" id="pos_editor_guardar_${moneda}">💾 Guardar posiciones</button>
+        <div class="aviso" id="pos_editor_msg_${moneda}" hidden></div>
+      </details>
+    `;
+    const tbody = div.querySelector(`#pos_editor_tbody_${moneda}`);
+    for (const f of posiciones) tbody.appendChild(filaEditablePosicion(f));
+    div.querySelector(`#pos_editor_agregar_${moneda}`).addEventListener("click", () => tbody.appendChild(filaEditablePosicion(null)));
+    div.querySelector(`#pos_editor_guardar_${moneda}`).addEventListener("click", () => onGuardarPosiciones(div, moneda, recargar));
+  }
+
+  async function onGuardarPosiciones(div, moneda, recargar) {
+    const msg = div.querySelector(`#pos_editor_msg_${moneda}`);
+    const btn = div.querySelector(`#pos_editor_guardar_${moneda}`);
+    const filas = leerFilasPosiciones(div.querySelector(`#pos_editor_tbody_${moneda}`));
+    btn.disabled = true;
+    btn.textContent = "Guardando…";
+    try {
+      await ImportarPortafolio.guardarPosicionesInversion(moneda, filas);
+      mostrarMsgInv(msg, `${filas.length} posición(es) guardadas.`, false);
+      await recargar();
+    } catch (err) {
+      mostrarMsgInv(msg, `No pude guardar: ${err.message}`, true);
+      console.error(err);
+      btn.disabled = false;
+      btn.textContent = "💾 Guardar posiciones";
+    }
   }
 
   // ---------------------------------------------------------------------

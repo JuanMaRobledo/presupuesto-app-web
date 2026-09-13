@@ -698,6 +698,11 @@ const ImportarPortafolio = (() => {
 
   return {
     render,
+    // guardarPosicionesInversion también la usa el editor manual de
+    // Posiciones (renderEditorPosiciones() en inversiones.js) -- mismo
+    // puerto de set_posiciones_inversion(), un solo lugar que sabe escribir
+    // A:D+F sin tocar las columnas de fórmula.
+    guardarPosicionesInversion,
     // Expuestas para pruebas.
     parseInversionCSV, deduplicarPosicionesImportadas, cruzarFlujos1031, flujosGuardablesDeCruces,
     resumenOperacionesInversion, posicionesBinanceDesdeMovimientos, combinarPosiciones, prefijosDeMoneda,
