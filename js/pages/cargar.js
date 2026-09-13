@@ -10,11 +10,13 @@ const PaginaCargar = (() => {
   function render(container) {
     container.innerHTML = `
       <h1>📤 Cargar Extractos</h1>
-      <p class="caption">Subí tus colillas de pago (PDF) o el extracto de tu cuenta de ahorros (.xlsx) para irlos
-      agregando al Sheet -- se categorizan solos, y te muestro una vista previa antes de aplicar nada.</p>
+      <p class="caption">Subí tus colillas de pago (PDF), el extracto de tu cuenta de ahorros (.xlsx) o el extracto
+      de tu tarjeta de crédito (.xlsx) para irlos agregando al Sheet -- se categorizan solos, y te muestro una
+      vista previa antes de aplicar nada.</p>
       <div class="tabs" id="tabs-cargar">
         <button class="tab-btn activo" data-tab="colillas">📄 Colillas de Pago</button>
         <button class="tab-btn" data-tab="cuenta">🏦 Cuenta de Ahorros</button>
+        <button class="tab-btn" data-tab="tarjeta">💳 Tarjeta de Crédito</button>
       </div>
       <div id="panel-cargar"></div>
     `;
@@ -32,7 +34,8 @@ const PaginaCargar = (() => {
 
     function renderTab() {
       if (activo === "colillas") renderCargarColillas(panel);
-      else renderCargarCuenta(panel);
+      else if (activo === "cuenta") renderCargarCuenta(panel);
+      else renderCargarTarjeta(panel);
     }
     renderTab();
   }
@@ -346,6 +349,214 @@ const PaginaCargar = (() => {
       msg.innerHTML = `<div class="error">Algo falló al aplicar los cambios: ${err.message}</div>`;
       btn.disabled = false;
       btn.textContent = `✅ Aplicar ${totalNuevos} movimiento(s) nuevo(s)`;
+    }
+  }
+
+  // =========================================================================
+  // Tarjeta de Crédito (Visa/Mastercard)
+  // =========================================================================
+  const TARJETA_RANGO_KEY = {
+    "Visa ****7497": { detalle: "visa_detalle", resumen: "visa_resumen" },
+    "Mastercard ****5922": { detalle: "mc_detalle", resumen: "mc_resumen", detalleUsd: "mc_detalle_usd" },
+  };
+
+  function renderCargarTarjeta(panel) {
+    panel.innerHTML = `
+      <p><strong>Sube uno o varios extractos detallados de la Visa o la Mastercard (.xlsx, tal como los descargas
+      de Bancolombia).</strong></p>
+      <details>
+        <summary>ℹ️ ¿Qué hace esta sección?</summary>
+        <p class="caption">Lee cada extracto de tarjeta (compras categorizadas solas, resumen del corte) y te
+        muestra una vista previa antes de aplicar nada. Los que ya estaban cargados, o repetidos entre los
+        archivos de esta subida, se detectan y se omiten. Al aplicar, escribe directo en la hoja de Egresos de
+        esa tarjeta en el Sheet.</p>
+      </details>
+      <input type="file" id="tj_input" accept=".xlsx" multiple>
+      <div id="tj_resultado"></div>
+    `;
+    panel.querySelector("#tj_input").addEventListener("change", (ev) => onArchivosTarjeta(ev, panel));
+  }
+
+  // Puerto de la parte de dedup de render_cargar_extractos() -- 'ya' por
+  // tarjeta se lee una sola vez (no por archivo/hoja) para no repetir la
+  // misma consulta de lectura si se suben varios meses de una vuelta.
+  async function onArchivosTarjeta(ev, panel) {
+    const archivos = [...ev.target.files];
+    const resultado = panel.querySelector("#tj_resultado");
+    if (!archivos.length) { resultado.innerHTML = ""; return; }
+    resultado.innerHTML = "Leyendo y comparando contra el Sheet…";
+
+    const yaPorTarjeta = new Map();
+    async function yaCargados(tarjetaLabel) {
+      if (!yaPorTarjeta.has(tarjetaLabel)) {
+        const rango = TARJETA_RANGO_KEY[tarjetaLabel].resumen;
+        const raw = await SheetsApi.batchGet([rango]);
+        yaPorTarjeta.set(tarjetaLabel, new Set((raw[rango] || []).map((f) => f[0]).filter(Boolean)));
+      }
+      return yaPorTarjeta.get(tarjetaLabel);
+    }
+
+    const parsed = [];
+    const vistosEnSubida = new Set();
+    for (const f of archivos) {
+      let wb;
+      try {
+        wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
+      } catch (err) {
+        parsed.push({ _error: `No pude abrir ${f.name}: ${err.message}`, _archivo: f.name });
+        continue;
+      }
+      for (const sn of wb.SheetNames) {
+        let r;
+        try {
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: true, defval: null });
+          r = TarjetaParser.parseExtractoSheet(rows, f.name, sn);
+        } catch (err) {
+          parsed.push({ _error: `No pude leer la hoja '${sn}' de ${f.name}: ${err.message}`, _archivo: f.name });
+          continue;
+        }
+        r._archivo = f.name;
+        r._sheet = sn;
+        try {
+          const ya = await yaCargados(r.tarjeta.label);
+          const claveSubida = `${r.tarjeta.label}::${r.statement.periodo}::${r.moneda}`;
+          r._duplicadoSubida = vistosEnSubida.has(claveSubida);
+          r._nueva = !ya.has(r.statement.periodo) && !r._duplicadoSubida;
+          vistosEnSubida.add(claveSubida);
+        } catch (err) {
+          r._nueva = false;
+          parsed.push({ _error: `No pude revisar la hoja '${r.tarjeta.sheet}' del Sheet: ${err.message}`, _archivo: f.name });
+        }
+        parsed.push(r);
+      }
+    }
+
+    renderPreviewTarjeta(resultado, parsed);
+  }
+
+  function renderPreviewTarjeta(resultado, parsed) {
+    let html = `<h4>Vista previa</h4>`;
+    for (const r of parsed) {
+      if (r._error) { html += `<div class="error">${r._error}</div>`; continue; }
+      const estado = r._nueva ? pill("nuevo", "ok")
+        : r._duplicadoSubida ? pill("repetido en esta subida — se omitirá", "skip")
+        : pill("ya cargado — se omitirá", "skip");
+      const s = r.statement;
+      html += `
+        <div class="card">
+          <p><strong>${r.tarjeta.label}</strong> — ${s.periodo} (${r.moneda}) &nbsp;
+            <span class="caption">${r._archivo} [${r._sheet}]</span> &nbsp; ${estado}</p>
+          <div class="metric-row">
+            ${metric("Pago total", fmtMoneda(s.pagoTotal))}
+            ${metric("Cupo disponible", fmtMoneda(s.cupoDisponible))}
+            ${metric("Movimientos", r.txns.length)}
+            ${metric("Pagar antes de", s.fechaLimite ? TarjetaParser.fechaISO(s.fechaLimite) : "?")}
+          </div>
+          <details>
+            <summary>Ver movimientos</summary>
+            <table class="tabla"><thead><tr><th>Fecha</th><th>Comercio</th><th>Cuotas</th><th>Valor este período</th><th>Categoría</th></tr></thead>
+              <tbody>${r.txns.map((t) => `<tr><td>${TarjetaParser.fechaISO(t.fechaCompra)}</td><td>${t.comercio}</td><td>${t.cuotas}</td><td>${fmtMoneda(t.valorPeriodo)}</td><td>${t.categoria}</td></tr>`).join("")}</tbody></table>
+          </details>
+          ${(() => {
+            const nuevosComercios = [...new Set(r.txns.filter((t) => t.categoria === "Otros" && t.nota === "Comercio no reconocido, clasificar manualmente").map((t) => t.comercio))];
+            return nuevosComercios.length ? `<p class="aviso">Comercios no reconocidos (quedarán en 'Otros', clasifícalos tú): ${nuevosComercios.join(", ")}</p>` : "";
+          })()}
+        </div>
+      `;
+    }
+
+    const nuevos = parsed.filter((r) => r._nueva);
+    if (nuevos.length) {
+      html += `<button id="tj_aplicar">✅ Aplicar ${nuevos.length} extracto(s) nuevo(s)</button><div id="tj_msg"></div>`;
+    } else if (parsed.some((r) => !r._error)) {
+      html += `<p>Todos los extractos subidos ya estaban cargados — no hay nada que aplicar.</p>`;
+    }
+    resultado.innerHTML = html;
+    if (nuevos.length) resultado.querySelector("#tj_aplicar").addEventListener("click", () => onAplicarTarjeta(resultado, nuevos));
+  }
+
+  function colLetra(n) {
+    return String.fromCharCode("A".charCodeAt(0) + n - 1);
+  }
+
+  // Puerto de first_blank_row() (sheets_backend.py) para el bloque resumen
+  // (tiene columnas de fórmula intercaladas, así que no se puede usar
+  // appendRows -- hace falta saber la fila exacta para escribir tramos de
+  // columnas sueltos con batchUpdateRanges).
+  async function primeraFilaLibreResumen(rangoNombre) {
+    const raw = await SheetsApi.batchGet([rangoNombre]);
+    const filas = raw[rangoNombre] || [];
+    const filaInicio = Number(RANGOS[rangoNombre].match(/!A(\d+):/)[1]);
+    let ultimoUsado = 0;
+    filas.forEach((fila, i) => {
+      if (fila && fila[0] !== undefined && fila[0] !== null && fila[0] !== "") ultimoUsado = i + 1;
+    });
+    return filaInicio + ultimoUsado;
+  }
+
+  // Puerto de _fila_detalle_tarjeta() (app_presupuesto.py).
+  function filaDetalleTarjeta(t) {
+    const saldo = t.saldoPendiente !== null && t.saldoPendiente !== undefined ? t.saldoPendiente : "";
+    return [t.periodoExtracto, TarjetaParser.fechaISO(t.fechaCompra), t.comercio, t.moneda, t.cuotas,
+      t.valorTotal, t.valorPeriodo, saldo, t.categoria, t.reembolsable, t.nota];
+  }
+
+  // Puerto de aplicar_extractos() (app_presupuesto.py).
+  async function onAplicarTarjeta(resultado, nuevos) {
+    const btn = resultado.querySelector("#tj_aplicar");
+    const msg = resultado.querySelector("#tj_msg");
+    btn.disabled = true;
+    btn.textContent = "Guardando…";
+    try {
+      const porHoja = new Map();
+      for (const r of nuevos) {
+        if (!porHoja.has(r.tarjeta.label)) porHoja.set(r.tarjeta.label, []);
+        porHoja.get(r.tarjeta.label).push(r);
+      }
+
+      for (const [tarjetaLabel, entradas] of porHoja) {
+        const blocks = TARJETA_RANGO_KEY[tarjetaLabel];
+        const vistosPeriodo = new Set();
+        for (const entrada of entradas) {
+          const periodo = entrada.statement.periodo;
+          if (!vistosPeriodo.has(periodo)) {
+            const entradasPeriodo = entradas.filter((e) => e.statement.periodo === periodo);
+            const copEntrada = entradasPeriodo.find((e) => e.moneda === "COP");
+            const usdEntrada = entradasPeriodo.find((e) => e.moneda === "USD");
+            const sFechas = (copEntrada || usdEntrada).statement;
+            const filaResumen = await primeraFilaLibreResumen(blocks.resumen);
+            const segments = [
+              { range: `${RANGOS[blocks.resumen].split("!")[0]}!A${filaResumen}:C${filaResumen}`,
+                values: [[sFechas.periodo, TarjetaParser.fechaISO(sFechas.fechaCorte), sFechas.fechaLimite ? TarjetaParser.fechaISO(sFechas.fechaLimite) : ""]] },
+            ];
+            if (copEntrada) {
+              const s = copEntrada.statement;
+              segments.push({ range: `${RANGOS[blocks.resumen].split("!")[0]}!D${filaResumen}:E${filaResumen}`, values: [[s.cupoTotal, s.cupoDisponible]] });
+              segments.push({ range: `${RANGOS[blocks.resumen].split("!")[0]}!G${filaResumen}:G${filaResumen}`, values: [[s.saldoAnterior]] });
+              segments.push({ range: `${RANGOS[blocks.resumen].split("!")[0]}!I${filaResumen}:J${filaResumen}`, values: [[s.pagoMinimo, s.pagoTotal]] });
+            }
+            if (blocks.detalleUsd && usdEntrada) {
+              segments.push({ range: `${RANGOS[blocks.resumen].split("!")[0]}!K${filaResumen}:K${filaResumen}`, values: [[usdEntrada.statement.pagoTotal]] });
+            }
+            await SheetsApi.batchUpdateRanges(segments);
+            vistosPeriodo.add(periodo);
+          }
+
+          const copTxns = entrada.txns.filter((t) => t.moneda === "COP");
+          const otrasTxns = entrada.txns.filter((t) => t.moneda !== "COP");
+          if (copTxns.length) await SheetsApi.appendRows(RANGOS[blocks.detalle], copTxns.map(filaDetalleTarjeta));
+          if (otrasTxns.length) {
+            if (!blocks.detalleUsd) throw new Error(`${tarjetaLabel} tiene movimientos en ${otrasTxns[0].moneda} pero todavía no tiene un bloque separado para esa moneda.`);
+            await SheetsApi.appendRows(RANGOS[blocks.detalleUsd], otrasTxns.map(filaDetalleTarjeta));
+          }
+        }
+      }
+      msg.innerHTML = `<p>Listo — ${nuevos.length} extracto(s) agregado(s) directamente al Google Sheet.</p>`;
+      btn.remove();
+    } catch (err) {
+      msg.innerHTML = `<div class="error">Algo falló al aplicar los cambios: ${err.message}</div>`;
+      btn.disabled = false;
+      btn.textContent = `✅ Aplicar ${nuevos.length} extracto(s) nuevo(s)`;
     }
   }
 
