@@ -280,17 +280,17 @@ const PaginaInversiones = (() => {
         <div id="inv-patrimonio"></div>
         <hr>
 
-        <div class="col-2">
-          <div>
-            <h4>Pesos (COP)</h4>
-            <div id="aportes-pesos"></div>
-          </div>
-          <div>
-            <h4>Dólares (USD)</h4>
-            <div id="aportes-dolares"></div>
-          </div>
+        <div>
+          <h4>Pesos (COP)</h4>
+          <div id="aportes-pesos"></div>
+        </div>
+        <hr>
+        <div>
+          <h4>Dólares (USD)</h4>
+          <div id="aportes-dolares"></div>
         </div>
 
+        <hr>
         <h4>Depósitos y retiros por plataforma</h4>
         <div class="col-2">
           <canvas id="chart_plataforma_pesos" height="180"></canvas>
