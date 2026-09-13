@@ -1,7 +1,9 @@
 // App de escritorio (Electron): abre la MISMA web estática de este repo
-// (app.html + js/ + css/) en una ventana propia, sin barra del navegador
-// -- no hay nada nuevo que mantener, es exactamente el mismo código que
-// corre en GitHub Pages, servido localmente.
+// (index.html + app.html + js/ + css/) en una ventana propia, sin barra del
+// navegador -- no hay nada nuevo que mantener, es exactamente el mismo
+// código que corre en GitHub Pages, servido localmente. Arranca en
+// index.html (la portada con las 2 tarjetas) para poder elegir entre la
+// versión Web y la de Streamlit también desde acá, no solo desde el navegador.
 //
 // Por qué un servidor HTTP local en vez de cargar app.html con file://:
 // Google Identity Services (el login) exige que la página se sirva desde
@@ -30,7 +32,7 @@ const MIME = {
 function iniciarServidorEstatico() {
   return http.createServer((req, res) => {
     let urlPath = decodeURIComponent((req.url || "/").split("?")[0]);
-    if (urlPath === "/") urlPath = "/app.html";
+    if (urlPath === "/") urlPath = "/index.html";
     const filePath = path.resolve(path.join(WEB_ROOT, urlPath));
     // Nunca servir nada fuera de WEB_ROOT (path traversal vía "..").
     if (!filePath.startsWith(WEB_ROOT)) { res.writeHead(403); res.end(); return; }
@@ -58,7 +60,7 @@ function crearVentana() {
       sandbox: true,
     },
   });
-  mainWindow.loadURL(`http://127.0.0.1:${PORT}/app.html`);
+  mainWindow.loadURL(`http://127.0.0.1:${PORT}/index.html`);
 
   // El popup de login de Google (Identity Services) necesita ser una
   // ventana HIJA de Electron de verdad -- no el navegador del sistema --

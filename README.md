@@ -16,7 +16,15 @@ referencia/backup. La versión de Streamlit sigue viva y desplegada en
 
 `index.html` es una portada simple con dos tarjetas para elegir entre esta
 versión (`app.html`, la app en sí) y la de Streamlit — la URL raíz de
-GitHub Pages abre esa portada.
+GitHub Pages abre esa portada. Es también el `start_url` del manifest
+(PWA) y lo que carga la app de escritorio (Electron) al abrir: instalada
+de cualquiera de las dos formas, arrancás en el selector, no directo en
+una versión — con un link "← Elegir otra versión" en `app.html` para
+volver, porque en modo standalone no hay barra de navegador con botón
+"atrás". La tarjeta de Streamlit abre en el navegador del sistema (no
+dentro de la ventana de Electron), a propósito: Streamlit tiene su propio
+login de Google y cargarlo embebido podría chocar con las restricciones
+de Google a los logins dentro de ventanas empotradas.
 
 ## Estado de la migración
 
@@ -428,7 +436,10 @@ del navegador:
   autorizaste alguna vez, esto funciona sin tocar nada más en Google Cloud
   Console) y abre una ventana de Electron apuntando ahí. El login de
   Google necesita un origen http(s) real, así que la ventana NO carga
-  `app.html` con `file://`.
+  `app.html` con `file://`. Arranca en `index.html` (la portada), igual
+  que la PWA — desde la misma ventana podés elegir la versión Web o abrir
+  la de Streamlit (esta última en el navegador del sistema, no dentro de
+  Electron).
 
   Para correrla en tu computador:
   ```bash

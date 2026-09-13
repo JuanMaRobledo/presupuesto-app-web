@@ -4,7 +4,19 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>💰 Presupuesto Personal</title>
-  <link rel="icon" href="data:," />
+  <link rel="icon" href="icons/icon-192.png" />
+
+  <!-- PWA: esta portada es el start_url (ver manifest.json) -- instalable
+       como app propia en computador/celular con ícono y splash propios,
+       para poder elegir entre la versión Web y la de Streamlit también
+       desde la app instalada, no solo desde el navegador. -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#1d4ed8" />
+  <!-- iOS/Safari no lee manifest.json para esto -- usa sus propias meta/link. -->
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Presupuesto" />
   <style>
     :root {
       color-scheme: light dark;
@@ -99,5 +111,11 @@
   </div>
 
   <footer>presupuesto-app-web</footer>
+
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+    }
+  </script>
 </body>
 </html>

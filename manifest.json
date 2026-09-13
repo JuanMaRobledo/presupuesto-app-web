@@ -3,7 +3,7 @@
   "short_name": "Presupuesto",
   "description": "Ingresos, gastos, deudas, presupuesto e inversiones — datos en vivo desde tu Google Sheet.",
   "id": "/app.html",
-  "start_url": "./app.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#ffffff",
