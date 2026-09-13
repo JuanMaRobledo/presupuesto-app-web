@@ -126,7 +126,34 @@ GitHub Pages abre esa portada.
   operaciones del historial" — tabla editable con agregar/quitar fila,
   igual que `_form_editar_historial()`; como esa hoja crece por filas en
   vez de ser un bloque reservado, "guardar" limpia todo el rango y lo
-  reescribe desde cero con lo que quede en la tabla.
+  reescribe desde cero con lo que quede en la tabla. "📥 Importar
+  portafolios y conciliar flujos con la cuenta 1031" (`js/pages/
+  importar-portafolio.js`) admite CSV de Hapi, Binance, Interactive Brokers
+  (reporte de portafolio) y Acciones y Valores/Trii — subís uno o varios a
+  la vez, reconstruye posiciones abiertas/cortas/cerradas con costo
+  promedio (mismo algoritmo BUY/SELL/SHORT/COVER que
+  `resumen_operaciones_inversion()`, incluida la venta parcial con costo
+  promedio ponderado), y concilia cada depósito/retiro contra "Egresos -
+  Efectivo" y "Otros Ingresos" (mismo emparejamiento por fecha ±7 días,
+  palabras clave por plataforma y tolerancia de tasa de cambio 2.500-5.500
+  que `_cruzar_flujos_1031()`) antes de guardar. "💾 Guardar" combina las
+  posiciones nuevas con las existentes de la misma moneda (reemplazando
+  solo los prefijos de plataforma recién importados, sin tocar Costo Total/
+  Valor Actual/Ganancia-Pérdida que son fórmulas del Sheet), agrega los
+  flujos conciliados a Aportes y las operaciones nuevas al Historial (con
+  la misma deduplicación económica que ya usan "Agregar un dividendo" y
+  "Editar historial" de arriba, así que volver a subir el mismo reporte no
+  duplica nada), y recategoriza a "Inversiones" los pagos PSE que financian
+  estas plataformas (mismo mapeo que `recategorizar_comercios()`, para no
+  contarlos dos veces como gasto genérico). **Ojo:** a diferencia de
+  Streamlit, todavía NO admite el PDF "Transaction History" de Interactive
+  Brokers — Python lo lee con `pdfplumber.extract_tables()`, que ubica
+  columnas por las líneas/espacios reales del PDF; pdf.js (ya usado acá
+  para las colillas de pago) solo da texto posicionado, no tablas, y sin un
+  extracto de ejemplo para validar un parser hecho a mano el riesgo de
+  reconstruir mal una cantidad/precio y guardar un monto financiero
+  incorrecto es demasiado alto — para ese caso puntual seguí usando la
+  versión de Streamlit.
 - 💰 Ingresos — **completo, con escritura**: sub-tabs Colillas de Pago
   (resumen histórico, tendencia por quincena, y el detalle devengos/
   descuentos tanto general como filtrado a un mes puntual, quincena por
@@ -217,10 +244,12 @@ GitHub Pages abre esa portada.
   últimos 3 con gasto > 0, redondeado al millar más cercano).
 
 ⏳ Todavía no portado (usá la versión de Streamlit mientras tanto):
-- Dentro de Inversiones: importar un reporte de portafolio completo
-  (CSV/XLSX) de un broker — patrimonio unificado, actualizar precios,
-  Crecimiento y Rentabilidad, agregar un dividendo/interés manual y editar
-  el historial de operaciones ya están portados, ver más abajo.
+- Dentro de Inversiones: importar el PDF "Transaction History" de
+  Interactive Brokers — importar CSV (Hapi/Binance/IBKR/Acciones y
+  Valores), conciliar contra la cuenta 1031, patrimonio unificado,
+  actualizar precios, Crecimiento y Rentabilidad, agregar un dividendo/
+  interés manual y editar el historial de operaciones ya están portados,
+  ver más arriba.
 
 Todo lo demás de la app, incluyendo el gráfico de "Tendencia de los últimos
 meses" de Resumen y Evolución/Año vs. Año de Análisis (las tres leen la hoja

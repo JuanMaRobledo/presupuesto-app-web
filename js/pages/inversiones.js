@@ -18,8 +18,10 @@
 // valores ya calculados -- ver cargarDatos() más abajo para cómo se degrada
 // si el Action todavía no corrió ni una vez (esas dos hojas no existen).
 //
-// TODAVÍA NO portado: importar portafolios, _form_agregar_dividendo() y
-// _form_editar_historial() (escritura sobre el historial de operaciones).
+// Importar portafolios (CSV de Hapi/Binance/IBKR/Acciones y Valores + cruce
+// con la cuenta 1031) vive en js/pages/importar-portafolio.js -- el PDF
+// "Transaction History" de IBKR todavía no está soportado ahí (ver el
+// comentario de encabezado de ese archivo).
 //
 // Posiciones se separa en 3 grupos, no 2 -- Acciones, Fondos de Inversión y
 // Liquidez -- para no mezclar cosas con riesgo de mercado distinto ni
@@ -308,10 +310,7 @@ const PaginaInversiones = (() => {
 
         <div id="inv-historial"></div>
 
-        <div class="aviso">⚠️ Todavía no portado: importar un reporte de portafolio completo (CSV/XLSX) del
-        broker. Usá
-        <a href="https://presupuesto-app-jmr.streamlit.app" target="_blank" rel="noopener">la versión de
-        Streamlit</a> para eso mientras tanto.</div>
+        <div id="inv-importar"></div>
       `;
 
       const recargar = () => render(container);
@@ -322,6 +321,7 @@ const PaginaInversiones = (() => {
       renderCrecimientoRentabilidad(contenido.querySelector("#inv-crecimiento-pesos"), datos, "pesos");
       renderCrecimientoRentabilidad(contenido.querySelector("#inv-crecimiento-dolares"), datos, "dolares");
       renderHistorialInversion(contenido.querySelector("#inv-historial"), datos, recargar);
+      ImportarPortafolio.render(contenido.querySelector("#inv-importar"), datos, recargar);
     } catch (err) {
       contenido.innerHTML = `<div class="error">Error cargando el Sheet: ${err.message}</div>`;
       console.error(err);
