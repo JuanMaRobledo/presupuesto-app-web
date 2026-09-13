@@ -350,7 +350,7 @@ const PaginaAnalisis = (() => {
       const totalesPorMoneda = {};
       for (const x of f) totalesPorMoneda[x.Moneda] = (totalesPorMoneda[x.Moneda] || 0) + x.Valor;
       const resumenTotales = Object.entries(totalesPorMoneda)
-        .map(([mon, val]) => mon === "USD" ? `US$ ${val.toLocaleString("en-US", { minimumFractionDigits: 2 })}` : fmtMoneda(val))
+        .map(([mon, val]) => mon === "USD" ? fmtUsd(val) : fmtMoneda(val))
         .join(" · ");
       panel.querySelector("#mv_resumen").textContent =
         `${f.length.toLocaleString("en-US")} de ${movs.length.toLocaleString("en-US")} movimientos — suma: ${resumenTotales}`;
@@ -359,7 +359,7 @@ const PaginaAnalisis = (() => {
         <thead><tr><th>Fuente</th><th>Periodo</th><th>Concepto</th><th>Categoría</th><th>Moneda</th><th>Valor</th><th>Presupuestar</th></tr></thead>
         <tbody>${f.slice(0, 1000).map((x) => `<tr><td>${x.Fuente}</td><td>${x.Periodo ?? ""}</td>
           <td>${x.Concepto ?? ""}</td><td>${x.Categoria ?? ""}</td><td>${x.Moneda}</td>
-          <td>${x.Moneda === "USD" ? "US$ " + x.Valor.toLocaleString("en-US", { minimumFractionDigits: 2 }) : fmtMoneda(x.Valor)}</td>
+          <td>${x.Moneda === "USD" ? fmtUsd(x.Valor) : fmtMoneda(x.Valor)}</td>
           <td>${x._presupuestar ? "Sí" : "No"}</td></tr>`).join("")}</tbody>
       `;
 

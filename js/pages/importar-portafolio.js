@@ -632,7 +632,7 @@ const ImportarPortafolio = (() => {
         <div class="tabla-scroll" style="max-height:260px;"><table class="tabla">
           <thead><tr><th>Plataforma</th><th>Activo</th><th>Estado</th><th>Operaciones</th><th>Resultado realizado</th></tr></thead>
           <tbody>${resumenHist.map((r) => `<tr><td>${r.plataforma}</td><td>${r.activo}</td><td>${r.estado}</td>
-            <td>${r.operaciones}</td><td>${r.resultado.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td></tr>`).join("")}</tbody>
+            <td>${r.operaciones}</td><td>${r.resultado.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr>`).join("")}</tbody>
         </table></div>`;
     }
 
@@ -660,7 +660,7 @@ const ImportarPortafolio = (() => {
           <thead><tr><th>Flujo</th><th>Plataforma</th><th>Fecha broker</th><th>Monto origen</th><th>Moneda</th>
             <th>Fecha cuenta 1031</th><th>COP conciliado</th><th>Tasa implícita</th><th>Estado</th></tr></thead>
           <tbody>${cruces.map((c) => `<tr><td>${c.tipo_flujo}</td><td>${c.plataforma}</td><td>${c.fecha}</td>
-            <td>${Number(c.monto_origen).toLocaleString("en-US", { minimumFractionDigits: 2 })}</td><td>${c.moneda_origen}</td>
+            <td>${Number(c.monto_origen).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td>${c.moneda_origen}</td>
             <td>${c.fecha_1031 ?? ""}</td><td>${c.cop.toLocaleString("en-US")}</td>
             <td>${c.tasa_implicita ? c.tasa_implicita.toFixed(2) : ""}</td><td>${c.estado}</td></tr>`).join("")}</tbody>
         </table></div>

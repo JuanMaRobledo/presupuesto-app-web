@@ -169,7 +169,7 @@ const PaginaResumen = (() => {
           <p class="caption">Estado actual — tampoco cambia según el selector de arriba.</p>
           <div class="metric-row">
             ${metric("Portafolio en pesos", fmtMoneda(portafolioPesos))}
-            ${metric("Portafolio en dólares", "US$ " + portafolioDolares.toLocaleString("en-US", { minimumFractionDigits: 2 }))}
+            ${metric("Portafolio en dólares", fmtUsd(portafolioDolares))}
           </div>
 
           <hr>

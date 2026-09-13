@@ -694,7 +694,7 @@ const PaginaEgresos = (() => {
         </div>
         <p class="caption">Fecha de Corte: ${fila.FechaCorte ?? ""} — Fecha Límite de Pago: ${fila.FechaLimitePago ?? ""}</p>
         ${tarjeta.tieneUsd && toNumber(fila.Col11) ? `<p class="caption">Saldo a pagar en USD (aparte, no se
-          suma con pesos): US$ ${toNumber(fila.Col11).toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>` : ""}
+          suma con pesos): ${fmtUsd(toNumber(fila.Col11))}</p>` : ""}
         <p><strong>Compras de este período (${detalleRows.length})</strong></p>
         ${detalleRows.length
           ? `<div class="tabla-scroll"><table class="tabla" id="ver_ext_tabla_${blockKey}"></table></div>`
@@ -726,7 +726,7 @@ const PaginaEgresos = (() => {
       <hr>
       <h4>Compras en USD (separado de los pesos de arriba — no se suman entre sí)</h4>
       ${filas && filas.length
-        ? `<p class="caption">${filas.length.toLocaleString("en-US")} movimientos — suma: US$ ${suma.toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>
+        ? `<p class="caption">${filas.length.toLocaleString("en-US")} movimientos — suma: ${fmtUsd(suma)}</p>
            <div class="tabla-scroll"><table class="tabla" id="mc_usd_tabla"></table></div>`
         : "<p>Todavía no hay compras en USD cargadas.</p>"}
     `;

@@ -105,8 +105,8 @@ const PaginaVerificarDatos = (() => {
       <div class="tabla-scroll" style="max-height:220px;"><table class="tabla">
         <thead><tr><th>Periodo Extracto</th><th>Compras del Mes (USD)</th><th>Saldo a pagar USD</th></tr></thead>
         <tbody>${periodos.map((p) => `<tr><td>${p}</td>
-          <td>${p in porPeriodo ? "US$ " + porPeriodo[p].toLocaleString("en-US", { minimumFractionDigits: 2 }) : "-"}</td>
-          <td>${p in saldoUsdPorPeriodo ? "US$ " + saldoUsdPorPeriodo[p].toLocaleString("en-US", { minimumFractionDigits: 2 }) : "-"}</td>
+          <td>${p in porPeriodo ? fmtUsd(porPeriodo[p]) : "-"}</td>
+          <td>${p in saldoUsdPorPeriodo ? fmtUsd(saldoUsdPorPeriodo[p]) : "-"}</td>
         </tr>`).join("")}</tbody>
       </table></div>
     `;

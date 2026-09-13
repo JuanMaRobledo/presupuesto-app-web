@@ -352,6 +352,104 @@ async function testRentabilidadUnificadaSeleccion() {
   await browser.close();
 }
 
+// Formato de montos en dólares: SIEMPRE 2 decimales, ni más ni menos --
+// reportado por el usuario con un screenshot real mostrando "US$ 12,704.116"
+// (3 decimales, ruido de punto flotante de Cantidad*Precio sin redondear).
+// Se prueba con un valor "sucio" a propósito en vez de uno redondo, y se
+// escanea TODO el texto de la página en dólares -- no solo un campo puntual
+// -- para agarrar cualquier otro lugar que use el mismo patrón bugueado.
+async function testFormatoUsdDosDecimales() {
+  const MOCK_RANGES = {
+    "'Inversiones - Pesos'!A5:H45": [],
+    "'Inversiones - Pesos'!A79:D1000": [],
+    "'Inversiones - Dólares'!A5:H45": [
+      ["IBKR - AAPL", "Acción", 3, 4234.7053333, 12704.116, 4234.7053333, 12704.116, 0.116],
+    ],
+    "'Inversiones - Dólares'!A79:D1000": [
+      ["2026-01-01", "Interactive Brokers", 40000000, ""],
+    ],
+    "'Datos de Mercado (Auto)'!A1:B10": [["TRM (USD/COP)", 4000]],
+    "'Historial TRM (Auto)'!A2:B5000": [],
+    "'Historial de Inversiones'!A2:J5000": [],
+    "'Historial de Valor de Cartera'!A2:F5000": [],
+  };
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+
+  await setupMocks(page, MOCK_RANGES);
+  await gotoLoggedIn(page);
+  await page.click('.nav-btn:has-text("📈 Informe de Inversiones")');
+  await page.waitForTimeout(600);
+
+  const texto = await page.locator("#ii-contenido").innerText();
+  check(texto.includes("US$ 12,704.12"), `El valor sucio (12704.116) se redondea a 2 decimales (vi: "${texto.slice(texto.indexOf("Valor de las posiciones"), texto.indexOf("Valor de las posiciones") + 60)}")`);
+  const conTresDecimales = texto.match(/\$\s?[\d,]+\.\d{3}\b/);
+  check(!conTresDecimales, `Ningún monto en dólares de la página queda con 3 decimales (vi: ${conTresDecimales ? conTresDecimales[0] : "ninguno"})`);
+
+  await browser.close();
+}
+
+// Aviso de ventana corta: con el único aporte hace pocos días, el XIRR
+// anualizado se dispara aunque la ganancia real sea chica -- tiene que
+// aparecer el aviso explicando que no es un error, es la anualización.
+// Con el mismo aporte pero viejo (MOCK_DOLARES_CON_MARGEN, 2026-01-01), NO
+// debe aparecer (ventana ya larga).
+async function testXirrVentanaCorta() {
+  const hace5Dias = new Date(Date.now() - 5 * 86400000).toISOString().slice(0, 10);
+  // Ganancia chica (+1.25% bruto, similar de magnitud al caso real
+  // reportado) sobre una ventana de apenas 5 días -- (1.0125)^(365/5)-1 ≈
+  // +147.6% anualizado, dentro del rango de convergencia de _xirr()
+  // ([-0.99, 10.0]), a diferencia de una ganancia grande en pocos días
+  // (esa combinación puede hacer que el anualizado implícito supere el
+  // límite de búsqueda y el XIRR directamente no converja).
+  const MOCK_RANGES = {
+    "'Inversiones - Pesos'!A5:H45": [],
+    "'Inversiones - Pesos'!A79:D1000": [],
+    "'Inversiones - Dólares'!A5:H45": [
+      ["IBKR - MSFT", "Acción", 100, 40, 4000, 40.5, 4050, 50],
+    ],
+    "'Inversiones - Dólares'!A79:D1000": [
+      [hace5Dias, "Interactive Brokers", 16000000, ""],
+    ],
+    "'Datos de Mercado (Auto)'!A1:B10": [["TRM (USD/COP)", 4000]],
+    "'Historial TRM (Auto)'!A2:B5000": [],
+    "'Historial de Inversiones'!A2:J5000": [],
+    "'Historial de Valor de Cartera'!A2:F5000": [],
+  };
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+
+  await setupMocks(page, MOCK_RANGES);
+  await gotoLoggedIn(page);
+  await page.click('.nav-btn:has-text("📈 Informe de Inversiones")');
+  await page.waitForTimeout(600);
+
+  const texto = await page.locator("#ii-contenido").innerText();
+  check(texto.includes("ventana tan corta amplifica"),
+    `Con un aporte de hace 5 días, aparece el aviso de ventana corta (vi: "${texto.slice(texto.indexOf("Rentabilidad anualizada"), texto.indexOf("Rentabilidad anualizada") + 300)}")`);
+
+  await browser.close();
+
+  // Mismo escenario pero con el aporte viejo (más de 90 días) -> sin aviso.
+  const browser2 = await chromium.launch();
+  const page2 = await browser2.newPage();
+  page2.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+  await setupMocks(page2, {
+    "'Inversiones - Pesos'!A5:H45": [],
+    "'Inversiones - Pesos'!A79:D1000": [],
+    ...MOCK_DOLARES_CON_MARGEN,
+  });
+  await gotoLoggedIn(page2);
+  await page2.click('.nav-btn:has-text("📈 Informe de Inversiones")');
+  await page2.waitForTimeout(600);
+  const texto2 = await page2.locator("#ii-contenido").innerText();
+  check(!texto2.includes("ventana tan corta amplifica"),
+    "Con un aporte viejo (2026-01-01), NO aparece el aviso de ventana corta");
+  await browser2.close();
+}
+
 (async () => {
   await testXirrCapitalPropioInforme();
   await testXirrUnificado();
@@ -360,6 +458,8 @@ async function testRentabilidadUnificadaSeleccion() {
   await testTwrCapitalPropio();
   await testPesoYContribucionPorPosicion();
   await testRentabilidadUnificadaSeleccion();
+  await testFormatoUsdDosDecimales();
+  await testXirrVentanaCorta();
   console.log(failures === 0 ? "\nTODOS LOS TESTS PASARON" : `\n${failures} TEST(S) FALLARON`);
   process.exit(failures === 0 ? 0 : 1);
 })().catch((err) => {

@@ -45,6 +45,19 @@ function fmtMoneda(v) {
   return n < 0 ? `-$${abs}` : `$${abs}`;
 }
 
+// Formato de un monto en dólares -- SIEMPRE 2 decimales, ni más ni menos.
+// toLocaleString("en-US", { minimumFractionDigits: 2 }) por sí solo NO
+// alcanza: sin un maximumFractionDigits explícito, el motor por defecto
+// permite hasta 3 decimales, así que un valor con ruido de punto flotante
+// (p. ej. una suma de cantidad*precio) se mostraba como "US$ 12,704.116"
+// en vez de "US$ 12,704.12" -- bug real reportado por el usuario, presente
+// en cada lugar del código que armaba este formato a mano en vez de usar
+// esta función.
+function fmtUsd(v) {
+  const n = Number(v) || 0;
+  return "US$ " + n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 // Puerto de es_no_presupuestar() (cuenta_formatos.py).
 function esNoPresupuestar(categoria) {
   return typeof categoria === "string" && categoria.trim().toLowerCase().endsWith(NO_PRESUPUESTAR_SUFIJO);

@@ -190,7 +190,7 @@ const PaginaEstadosFinancieros = (() => {
         ${metric("Total Activos", fmtMoneda(totalActivos))}
       </div>
       ${valorPortafolioDolares ? `<p class="caption">Portafolio de inversiones en dólares (aparte, no
-        sumado): US$ ${valorPortafolioDolares.toLocaleString("en-US", { minimumFractionDigits: 2 })}</p>` : ""}
+        sumado): ${fmtUsd(valorPortafolioDolares)}</p>` : ""}
       ${(valorPortafolioPesos === 0 && valorPortafolioDolares === 0) ? `<p class="caption">El portafolio de
         inversiones da $0 porque todavía no cargaste posiciones en 📈 Inversiones.</p>` : ""}
 
@@ -200,7 +200,7 @@ const PaginaEstadosFinancieros = (() => {
         ${metric("Cuota mensual total", fmtMoneda(cuotaMensualTotal))}
       </div>
       ${deudaUsd && deudaUsd[0] ? `<p class="caption">${deudaUsd[0]} — deuda en dólares (aparte, no sumada):
-        US$ ${toNumber(deudaUsd[2]).toLocaleString("en-US", { minimumFractionDigits: 2 })}. ${deudaUsd[1] || ""}</p>` : ""}
+        ${fmtUsd(toNumber(deudaUsd[2]))}. ${deudaUsd[1] || ""}</p>` : ""}
 
       <h5>Patrimonio Neto</h5>
       <div class="metric-row">${metric("Activos − Pasivos (pesos)", fmtMoneda(patrimonioNeto))}</div>

@@ -72,7 +72,7 @@ const PaginaDeudas = (() => {
           </div>
           ${deudaUsd && deudaUsd[0] ? `
             <div class="metric-row">
-              ${metric(`${deudaUsd[0]} — deuda en dólares (aparte)`, "US$ " + toNumber(deudaUsd[2]).toLocaleString("en-US", { minimumFractionDigits: 2 }))}
+              ${metric(`${deudaUsd[0]} — deuda en dólares (aparte)`, fmtUsd(toNumber(deudaUsd[2])))}
             </div>
             <p class="caption">${deudaUsd[1] || ""}</p>
           ` : ""}

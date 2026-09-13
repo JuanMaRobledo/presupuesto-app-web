@@ -112,6 +112,19 @@ const PaginaInformeInversiones = (() => {
     return xirr(flujos);
   }
 
+  // Puerto de _dias_desde_primer_aporte(moneda): días entre el aporte/
+  // retiro más antiguo y hoy -- para avisar cuando un XIRR anualizado
+  // viene de una ventana muy corta (no es un error de cálculo, pero un
+  // retorno chico proyectado a un año entero puede dar un número enorme).
+  function diasDesdePrimerAporte(aportes) {
+    let masAntigua = null;
+    for (const f of aportes) {
+      const fechaISO = parseFechaISO(f.Fecha);
+      if (fechaISO && toNumber(f.MontoTransferido) && (masAntigua === null || fechaISO < masAntigua)) masAntigua = fechaISO;
+    }
+    return masAntigua ? Math.round((new Date() - new Date(masAntigua)) / 86400000) : null;
+  }
+
   // Puerto de _analizar_portafolio_moneda(moneda).
   function analizarPortafolioMoneda(posiciones) {
     const posConTicker = posiciones.filter((f) => String(f.TickerFondo || "").trim() !== "");
@@ -298,7 +311,7 @@ const PaginaInformeInversiones = (() => {
     const info = analizarPortafolioMoneda(posiciones);
     if (!info) { div.innerHTML = `<h3>${nombre}</h3><p>Todavía no hay posiciones cargadas acá.</p>`; return; }
 
-    const fmt = (v) => (moneda === "dolares" ? "US$ " + v.toLocaleString("en-US", { minimumFractionDigits: 2 }) : fmtMoneda(v));
+    const fmt = (v) => (moneda === "dolares" ? fmtUsd(v) : fmtMoneda(v));
     const retornoBruto = info.costo ? (info.ganancia / info.costo * 100) : 0;
     const capitalPropioValido = info.costoPropio > 0;
     const retornoPropio = capitalPropioValido ? (info.ganancia / info.costoPropio * 100) : null;
@@ -328,6 +341,20 @@ const PaginaInformeInversiones = (() => {
         ${metric("Rentabilidad anualizada (XIRR)", xirrVal !== null ? `${(xirrVal * 100).toFixed(1)}%` : "—")}
       </div>
     `;
+    // Anualizar un retorno medido sobre pocos días amplifica muchísimo
+    // cualquier variación (un +1% en una semana se proyecta como si se
+    // repitiera 52 veces en el año) -- no es un error de cálculo, pero sin
+    // este aviso un XIRR de +100% con apenas +1-2% de ganancia real se ve
+    // como un bug. 90 días (~un trimestre) como umbral.
+    const diasHistorial = diasDesdePrimerAporte(aportes);
+    if (xirrVal !== null && diasHistorial !== null && diasHistorial < 90) {
+      html += `<p class="caption">⚠️ El XIRR de arriba se calculó sobre apenas ${diasHistorial} día(s) desde tu
+        primer aporte/retiro en esta moneda -- anualizar una ventana tan corta amplifica muchísimo cualquier
+        variación (un par de puntos porcentuales de ganancia real, proyectados como si se repitieran todo el
+        año, pueden dar un número enorme). No es un error: con más historial este porcentaje se va a estabilizar
+        solo. Mientras tanto, el retorno bruto/sobre capital propio de arriba (sin anualizar) es más
+        representativo de lo que de verdad ganaste hasta ahora.</p>`;
+    }
     if (Math.abs(info.ajuste) > 1) {
       const motivo = info.ajuste < 0 ? "margen prestado por el bróker" : "efectivo sin invertir";
       html += `<p class="caption">Hay ${fmt(Math.abs(info.ajuste))} de ${motivo} mezclados en el valor de la
@@ -427,7 +454,7 @@ const PaginaInformeInversiones = (() => {
         html += `
           <div class="metric-row">
             ${metric("Aportado (histórico)", fmtMoneda(fx.totalCop))}
-            ${metric("Equivalente en dólares al aportar", "US$ " + fx.totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2 }))}
+            ${metric("Equivalente en dólares al aportar", fmtUsd(fx.totalUsd))}
             ${metric("TRM promedio ponderado al aportar", fx.trmPromedio ? "$" + fx.trmPromedio.toLocaleString("en-US", { maximumFractionDigits: 0 }) : "—")}
           </div>
           <div class="metric-row">
@@ -470,7 +497,7 @@ const PaginaInformeInversiones = (() => {
                 <th>USD equivalente</th><th>TRM hoy</th><th>Valor hoy (COP)</th><th>Diferencia cambiaria</th></tr></thead>
               <tbody>${fx.filas.map((f) => `<tr><td>${f.fecha}</td><td>${f.plataforma ?? ""}</td>
                 <td>${fmtMoneda(f.montoCop)}</td><td>$${f.trmFecha.toLocaleString("en-US", { maximumFractionDigits: 0 })}</td>
-                <td>US$ ${f.usdEquiv.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
+                <td>${fmtUsd(f.usdEquiv)}</td>
                 <td>$${fx.trmHoy.toLocaleString("en-US", { maximumFractionDigits: 0 })}</td>
                 <td>${fmtMoneda(f.valorHoy)}</td><td>${fmtMoneda(f.diferencia)}</td></tr>`).join("")}</tbody>
             </table></div>
@@ -572,7 +599,7 @@ const PaginaInformeInversiones = (() => {
       </div>
       <div class="metric-row">
         ${metric("Resultado realizado (COP)", fmtMoneda(realizadoCop))}
-        ${metric("Resultado realizado (USD)", "US$ " + realizadoUsd.toLocaleString("en-US", { minimumFractionDigits: 2 }))}
+        ${metric("Resultado realizado (USD)", fmtUsd(realizadoUsd))}
       </div>
       <p class="caption">Ya queda reflejado en el costo promedio de lo que sigue abierto arriba — no lo sumes
       aparte a la ganancia no realizada.</p>

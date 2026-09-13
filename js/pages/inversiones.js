@@ -475,13 +475,13 @@ const PaginaInversiones = (() => {
         cada moneda por separado, sin unificar.</p>
         <div class="metric-row">
           ${metric("Pesos (COP)", fmtMoneda(patrimonioPesos))}
-          ${metric("Dólares (USD)", "US$ " + patrimonioDolares.toLocaleString("en-US", { minimumFractionDigits: 2 }))}
+          ${metric("Dólares (USD)", fmtUsd(patrimonioDolares))}
         </div>
         ${hayLiquidez ? `
           <h5>💰 Efectivo, margen y cuentas de liquidez</h5>
           <div class="metric-row">
             ${metric("Pesos (COP)", fmtMoneda(cajaPesos))}
-            ${metric("Dólares (USD)", "US$ " + cajaDolares.toLocaleString("en-US", { minimumFractionDigits: 2 }))}
+            ${metric("Dólares (USD)", fmtUsd(cajaDolares))}
           </div>` : ""}
       `;
       return;
@@ -630,7 +630,7 @@ const PaginaInversiones = (() => {
     if (bench && bench.nombre) {
       const sepBench = separarPosiciones(posicionesMoneda);
       const valorReal = patrimonioTotal([...sepBench.acciones, ...sepBench.fondos]);
-      const fmtBench = (v) => (moneda === "dolares" ? "US$ " + v.toLocaleString("en-US", { minimumFractionDigits: 2 }) : fmtMoneda(v));
+      const fmtBench = (v) => (moneda === "dolares" ? fmtUsd(v) : fmtMoneda(v));
       if (bench.valorShadow !== null) {
         const diferencia = valorReal - bench.valorShadow;
         div.insertAdjacentHTML("beforeend", `
@@ -1010,7 +1010,7 @@ const PaginaInversiones = (() => {
   function renderPosiciones(posiciones, moneda, aportes = null) {
     if (!posiciones.length) return `<p>Todavía no hay posiciones cargadas.</p>`;
     const { acciones, fondos, liquidez } = separarPosiciones(posiciones);
-    const fmtVal = (v) => moneda === "USD" ? "US$ " + toNumber(v).toLocaleString("en-US", { minimumFractionDigits: 2 }) : fmtMoneda(v);
+    const fmtVal = (v) => moneda === "USD" ? fmtUsd(toNumber(v)) : fmtMoneda(v);
     const tabla = (filas) => `
       <table class="tabla">
         <thead><tr><th>Ticker / Fondo</th><th>Tipo</th><th>Cantidad</th><th>Precio Compra Prom.</th>
@@ -1308,7 +1308,7 @@ const PaginaInversiones = (() => {
       <div class="metric-row">
         ${metric("Posiciones cerradas", resumen.filter((r) => r.Estado === "Cerrada").length)}
         ${metric("Estrategias en corto", resumen.filter((r) => r.Estrategia === "Corto").length)}
-        ${metric("Realizado en compraventas USD", "US$ " + (realizadoPorMoneda.USD || 0).toLocaleString("en-US", { minimumFractionDigits: 2 }))}
+        ${metric("Realizado en compraventas USD", fmtUsd(realizadoPorMoneda.USD || 0))}
         ${metric("Realizado en compraventas COP", fmtMoneda(realizadoPorMoneda.COP || 0))}
       </div>
       <p class="caption">Este resultado realizado corresponde a compras, ventas, cortos y coberturas. Dividendos,
@@ -1330,7 +1330,7 @@ const PaginaInversiones = (() => {
         <td>${r.Plataforma ?? ""}</td><td>${r.Activo ?? ""}</td><td>${r.Moneda ?? ""}</td>
         <td>${r.Estrategia}</td><td>${r.Estado}</td>
         <td>${r.CantidadNeta.toLocaleString("en-US", { maximumFractionDigits: 4 })}</td>
-        <td>${r.Moneda === "USD" ? "US$ " + r.ResultadoRealizado.toLocaleString("en-US", { minimumFractionDigits: 2 }) : fmtMoneda(r.ResultadoRealizado)}</td>
+        <td>${r.Moneda === "USD" ? fmtUsd(r.ResultadoRealizado) : fmtMoneda(r.ResultadoRealizado)}</td>
         <td>${r.PrimeraOperacion}</td><td>${r.UltimaOperacion}</td>
       </tr>`).join("")}</tbody>
     `;
@@ -1421,7 +1421,7 @@ const PaginaInversiones = (() => {
     try {
       await SheetsApi.appendRows(RANGOS.historial_inversion, [fila]);
       const etiqueta = tipo === "DIVIDEND" ? "Dividendo" : "Interés";
-      mostrarMsgInv(msg, `${etiqueta} de ${valor.toLocaleString("en-US", { minimumFractionDigits: 2 })} ${moneda} agregado.`, false);
+      mostrarMsgInv(msg, `${etiqueta} de ${valor.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${moneda} agregado.`, false);
       await recargar();
     } catch (err) {
       mostrarMsgInv(msg, `No pude guardar: ${err.message}`, true);
@@ -1603,7 +1603,7 @@ const PaginaInversiones = (() => {
       <p class="caption">Aparte del resultado realizado de compraventas — ingreso pasivo real, no viene de
       vender nada.</p>
       <div class="metric-row">
-        ${metric("Recibido en USD", "US$ " + (porMoneda.USD || 0).toLocaleString("en-US", { minimumFractionDigits: 2 }))}
+        ${metric("Recibido en USD", fmtUsd(porMoneda.USD || 0))}
         ${metric("Recibido en COP", fmtMoneda(porMoneda.COP || 0))}
       </div>
       <div id="hist_pasivo_charts" class="col-2"></div>
