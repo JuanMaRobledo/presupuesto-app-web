@@ -49,7 +49,7 @@ const MOCK_BASE = {
     ["2026-01-01", "Interactive Brokers", 4000000, ""],
   ],
   "'Historial de Inversiones'!A2:J5000": [],
-  "'Historial de Valor de Cartera'!A2:E5000": [
+  "'Historial de Valor de Cartera'!A2:F5000": [
     ["2026-01-01", "dolares", 900, 1000, 1000],
     ["2026-02-01", "dolares", 900, 1100, 1000],
   ],

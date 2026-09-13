@@ -73,7 +73,7 @@ async function testAportesFiducuentaAparte() {
     "'Inversiones - Dólares'!A79:D1000": [],
     "'Historial de Inversiones'!A2:J5000": [],
     "'Datos de Mercado (Auto)'!A1:B10": [["TRM (USD/COP)", 3077.49]],
-    "'Historial de Valor de Cartera'!A2:E5000": [],
+    "'Historial de Valor de Cartera'!A2:F5000": [],
   };
 
   const browser = await chromium.launch();
@@ -121,7 +121,7 @@ async function testRentabilidadPersonalizadaIncluyeFiducuenta() {
     "'Inversiones - Dólares'!A79:D1000": [],
     "'Historial de Inversiones'!A2:J5000": [],
     "'Datos de Mercado (Auto)'!A1:B10": [["TRM (USD/COP)", 3077.49]],
-    "'Historial de Valor de Cartera'!A2:E5000": [
+    "'Historial de Valor de Cartera'!A2:F5000": [
       ["01/09/2026", "pesos", 2965929, 2838400, 5000000],
     ],
   };
@@ -166,7 +166,7 @@ async function testEfectivoMargenCuentaAparte() {
     ],
     "'Historial de Inversiones'!A2:J5000": [],
     "'Datos de Mercado (Auto)'!A1:B10": [["TRM (USD/COP)", 4000]],
-    "'Historial de Valor de Cartera'!A2:E5000": [],
+    "'Historial de Valor de Cartera'!A2:F5000": [],
   };
 
   const browser = await chromium.launch();

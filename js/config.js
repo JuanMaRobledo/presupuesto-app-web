@@ -59,7 +59,7 @@ const RANGOS = {
   // Action corre por primera vez, ver el manejo de ese caso en
   // PaginaInversiones.cargarDatos() (js/pages/inversiones.js).
   datos_mercado: "'Datos de Mercado (Auto)'!A1:B10",
-  historial_valor_cartera: "'Historial de Valor de Cartera'!A2:E5000",
+  historial_valor_cartera: "'Historial de Valor de Cartera'!A2:F5000",
   // La escribe scripts/actualizar_mercado.py (serie diaria de TRM desde el
   // aporte en dólares más antiguo) -- no existe hasta el primer corrido
   // DESPUÉS de que ese Action empezó a escribirla; puede seguir sin existir

@@ -118,7 +118,13 @@ de Google a los logins dentro de ventanas empotradas.
   p. ej. "Interactive Brokers - Efectivo/Margen" es una cuenta propia,
   distinta de "Interactive Brokers"): marcar/desmarcar recalcula la tabla y
   el resumen Depósitos/Retiros/Flujo neto, o la rentabilidad/XIRR, al
-  vuelo, sin volver a pedirle nada al Sheet. El valor de cada cuenta se
+  vuelo, sin volver a pedirle nada al Sheet. Si alguna plataforma marcada
+  tiene su propia cuenta de Efectivo/Margen, "🎛️ Rentabilidad
+  personalizada" la suma sola en un XIRR "sobre capital propio" aparte (y,
+  en dólares, uno más en USD puro) — no hace falta buscarla y marcarla a
+  mano; además trae un TWR sobre capital propio de TODA la moneda (no se
+  puede filtrar por selección, las fotos guardadas son del total, no por
+  plataforma). El valor de cada cuenta se
   calcula del lado del cliente a partir del TickerFondo de cada posición
   (Posiciones no tiene columna Plataforma propia), y un aporte/retiro se
   cuenta completo por la plataforma a la que fue destinado — no se puede
@@ -230,12 +236,24 @@ de Google a los logins dentro de ventanas empotradas.
   — retorno bruto, capital propio (descuenta el margen/efectivo de ambos
   lados), XIRR **y XIRR sobre capital propio** (el margen prestado se
   descuenta del valor final, no de la ganancia — no es una pérdida, es
-  plata que no es tuya) y TWR por moneda, mejor/peor posición, composición y G/P%
-  por posición (gráficos), capital aportado por plataforma, operaciones
-  cerradas (tasa de acierto, resultado realizado) y, en dólares, "💱 Efecto
-  cambiario de los aportes (TRM)" (cuánto ganaste/perdiste solo por el tipo
-  de cambio, aparte del rendimiento de las posiciones, más el "Retorno
-  combinado en pesos"). El TWR en dólares y el efecto cambiario necesitan
+  plata que no es tuya) **y, en dólares, XIRR sobre capital propio en USD
+  puro** (sin convertir nada a pesos, aislando el efecto cambiario) y TWR
+  por moneda **más TWR sobre capital propio** (lo más parecido a lo que
+  un bróker muestra como "tu rentabilidad %" — ponderado por tiempo, no le
+  importa cuándo aportaste ni cuándo tomaste margen; usa la columna nueva
+  "Valor Capital Propio" de 'Historial de Valor de Cartera', que escribe
+  `scripts/actualizar_mercado.py` — no retroactivo, arranca desde la
+  primera corrida del Action después de este cambio). Por posición: **Peso
+  %** (cuánto pesa sobre el valor total de títulos) y **Contribución %**
+  (cuánto puso esa posición de la ganancia/pérdida TOTAL de la cartera,
+  distinto del G/P % de esa posición sola) — mejor/peor posición,
+  composición y G/P% por posición (gráficos con título, formato de moneda/
+  porcentaje y peso/monto en el tooltip), capital aportado por plataforma,
+  operaciones cerradas (tasa de acierto, resultado realizado) y, en
+  dólares, "💱 Efecto cambiario de los aportes (TRM)" (cuánto ganaste/
+  perdiste solo por el tipo de cambio, aparte del rendimiento de las
+  posiciones, más el "Retorno combinado en pesos"). El TWR en dólares y el
+  efecto cambiario necesitan
   la TRM histórica día a día (convertir cada aporte en pesos a su
   equivalente en dólares de la fecha exacta de esa transferencia) — un
   sitio estático no puede descargarla de Yahoo Finance (CORS), así que

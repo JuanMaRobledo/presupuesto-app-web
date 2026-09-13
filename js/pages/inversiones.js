@@ -54,7 +54,7 @@ const PaginaInversiones = (() => {
   ];
   const SIGNO_OPERACION = { BUY: 1, COVER: 1, SELL: -1, SHORT: -1 };
   // Puerto de VALOR_CARTERA_HEADERS (sheets_backend.py).
-  const VALOR_CARTERA_COLS = ["Fecha", "Moneda", "ValorCosto", "ValorActual", "AportesNetos"];
+  const VALOR_CARTERA_COLS = ["Fecha", "Moneda", "ValorCosto", "ValorActual", "AportesNetos", "ValorCapitalPropio"];
   const charts = {};
 
   // Tipos que representan un saldo de efectivo/reserva, no una inversión de
@@ -153,6 +153,22 @@ const PaginaInversiones = (() => {
     } catch (err) {
       console.warn("Todavía no hay datos de mercado del GitHub Action (¿corrió alguna vez?):", err.message);
     }
+    // Aparte: 'Historial TRM (Auto)' -- solo hace falta para el XIRR sobre
+    // capital propio en USD puro de 🎛️ Rentabilidad personalizada (dólares).
+    // Puede no existir todavía (Action nunca corrió con esto, o nunca hubo
+    // un aporte en dólares que lo dispare) sin que rompa el resto de la
+    // página -- mismo aislamiento que datos_mercado/historial_valor_cartera.
+    let historialTrm = [];
+    try {
+      const rawTrm = await SheetsApi.batchGet(["historial_trm"]);
+      historialTrm = (rawTrm.historial_trm || [])
+        .filter((r) => r && r[0])
+        .map((r) => ({ fechaISO: parseFechaISO(r[0]), valor: toNumber(r[1]) }))
+        .filter((r) => r.fechaISO)
+        .sort((a, b) => a.fechaISO.localeCompare(b.fechaISO));
+    } catch (err) {
+      console.warn("Todavía no hay histórico de TRM del GitHub Action:", err.message);
+    }
     return {
       aportesPesos: filasAObjetos(raw.aportes_inversion_pesos, APORTE_COLS, ["Fecha"]),
       aportesDolares: filasAObjetos(raw.aportes_inversion_dolares, APORTE_COLS, ["Fecha"]),
@@ -161,6 +177,7 @@ const PaginaInversiones = (() => {
       historial: filasAObjetos(raw.historial_inversion, HISTORIAL_COLS, ["Fecha"]),
       mercado,
       historialValorCartera,
+      historialTrm,
     };
   }
 
@@ -222,6 +239,88 @@ const PaginaInversiones = (() => {
     if (valorFinal) flujos.push({ fecha: new Date().toISOString().slice(0, 10), monto: valorFinal });
     if (flujos.length < 2 || !flujos.some((f) => f.monto < 0) || !flujos.some((f) => f.monto > 0)) return null;
     return xirr(flujos);
+  }
+
+  // Nearest prior-or-equal: puerto de _precio_en()/_trm_en() (app_presupuesto.py).
+  function trmEn(serieTrm, fechaISO) {
+    let ultimo = null;
+    for (const p of serieTrm) {
+      if (p.fechaISO <= fechaISO) ultimo = p; else break;
+    }
+    return ultimo ? ultimo.valor : (serieTrm.length ? serieTrm[0].valor : null);
+  }
+
+  // Puerto de _rentabilidad_xirr_capital_propio_usd() (app_presupuesto.py):
+  // XIRR de dólares, en USD puro -- cada aporte se convierte con la TRM
+  // HISTÓRICA de ESA fecha (no la de hoy), así el efecto cambiario no
+  // queda mezclado adentro del número. El valor final ya es capital propio
+  // en dólares, sin ninguna conversión.
+  function rentabilidadXirrCapitalPropioUsd(aportesDolares, valorCapitalPropioUsd, serieTrm) {
+    if (!serieTrm || !serieTrm.length) return null;
+    const flujos = [];
+    for (const f of aportesDolares) {
+      const fechaISO = parseFechaISO(f.Fecha);
+      const montoCop = toNumber(f.MontoTransferido);
+      if (!fechaISO || !montoCop) continue;
+      const trmFecha = trmEn(serieTrm, fechaISO);
+      if (!trmFecha) continue;
+      flujos.push({ fecha: fechaISO, monto: -montoCop / trmFecha });
+    }
+    if (valorCapitalPropioUsd) flujos.push({ fecha: new Date().toISOString().slice(0, 10), monto: valorCapitalPropioUsd });
+    if (flujos.length < 2 || !flujos.some((f) => f.monto < 0) || !flujos.some((f) => f.monto > 0)) return null;
+    return xirr(flujos);
+  }
+
+  // Puerto de _twr_moneda() (app_presupuesto.py) -- Modified Dietz encadenado
+  // entre fotos consecutivas de 'Historial de Valor de Cartera'.
+  // 'capitalPropio=true' usa ValorCapitalPropio (Valor Actual + liquidez)
+  // en vez de ValorActual bruto -- no es retroactivo, arranca desde la
+  // primera foto que ya tenga esa columna.
+  function twrMoneda(historialValorCartera, aportes, moneda, serieTrm, capitalPropio = false) {
+    const campoValor = capitalPropio ? "ValorCapitalPropio" : "ValorActual";
+    const snaps = historialValorCartera
+      .filter((f) => f.Moneda === moneda && (!capitalPropio || (f[campoValor] !== null && f[campoValor] !== "")))
+      .map((f) => ({ fecha: parseFechaISO(f.Fecha), valor: toNumber(f[campoValor]) }))
+      .filter((f) => f.fecha)
+      .sort((a, b) => a.fecha.localeCompare(b.fecha));
+    const porFecha = {};
+    for (const s of snaps) porFecha[s.fecha] = s.valor;
+    const fechas = Object.keys(porFecha).sort();
+    if (fechas.length < 2) return null;
+
+    const aportesValidos = aportes.filter((f) => parseFechaISO(f.Fecha) && toNumber(f.MontoTransferido));
+    if (moneda === "dolares" && aportesValidos.length && (!serieTrm || !serieTrm.length)) return null;
+
+    const flujos = [];
+    for (const f of aportesValidos) {
+      const fechaISO = parseFechaISO(f.Fecha);
+      let monto = toNumber(f.MontoTransferido);
+      if (moneda === "dolares") {
+        const trmFecha = trmEn(serieTrm, fechaISO);
+        if (!trmFecha) continue;
+        monto = monto / trmFecha;
+      }
+      flujos.push({ fecha: fechaISO, monto });
+    }
+
+    let factor = 1.0;
+    let nSub = 0;
+    for (let i = 1; i < fechas.length; i++) {
+      const t0 = fechas[i - 1], t1 = fechas[i];
+      const v0 = porFecha[t0], v1 = porFecha[t1];
+      const diasSub = (new Date(t1) - new Date(t0)) / 86400000;
+      if (diasSub <= 0) continue;
+      const cfs = flujos.filter((fl) => fl.fecha > t0 && fl.fecha <= t1);
+      const sumaCf = cfs.reduce((s, fl) => s + fl.monto, 0);
+      const denom = v0 + cfs.reduce((s, fl) => s + fl.monto * ((new Date(t1) - new Date(fl.fecha)) / 86400000) / diasSub, 0);
+      if (denom === 0) continue;
+      factor *= 1 + (v1 - v0 - sumaCf) / denom;
+      nSub += 1;
+    }
+    if (nSub === 0) return null;
+    const diasTotales = (new Date(fechas[fechas.length - 1]) - new Date(fechas[0])) / 86400000;
+    const twrAnual = diasTotales > 0 ? Math.pow(factor, 365 / diasTotales) - 1 : null;
+    return { twrAnual, dias: diasTotales, nSubperiodos: nSub };
   }
 
   function patrimonioTotal(posiciones) {
@@ -483,7 +582,8 @@ const PaginaInversiones = (() => {
       const valorInversion = patrimonioTotal([...sep.acciones, ...sep.fondos]);
 
       renderRentabilidadPersonalizada(
-        div.querySelector(`#rentper_${moneda}`), aportesMoneda, posicionesMoneda, moneda, datos.mercado.trm);
+        div.querySelector(`#rentper_${moneda}`), aportesMoneda, posicionesMoneda, moneda, datos.mercado.trm,
+        datos.historialValorCartera, datos.historialTrm);
 
       // Vista consolidada (solo pesos): acciones + Fiducuenta juntos -- acá
       // SÍ se combinan los aportes/retiros de ambas plataformas, pero
@@ -573,7 +673,8 @@ const PaginaInversiones = (() => {
     return esCuentaLiquidez(f) && /Efectivo\/Margen$/i.test(String(f.TickerFondo || "")) ? `${p} - Efectivo/Margen` : p;
   }
 
-  function renderRentabilidadPersonalizada(div, aportesMoneda, posicionesMoneda, moneda, trm) {
+  function renderRentabilidadPersonalizada(div, aportesMoneda, posicionesMoneda, moneda, trm,
+                                            historialValorCartera, historialTrm) {
     const cuentas = [...new Set([
       ...aportesMoneda.map((f) => f.Plataforma),
       ...posicionesMoneda.map(claveCuenta),
@@ -602,6 +703,7 @@ const PaginaInversiones = (() => {
       `).join("")}</div>
       <div id="rentper_metrics_${moneda}" class="metric-row"></div>
       <div id="rentper_aviso_${moneda}"></div>
+      <div id="rentper_twr_${moneda}"></div>
     `;
 
     const metricsDiv = div.querySelector(`#rentper_metrics_${moneda}`);
@@ -659,6 +761,16 @@ const PaginaInversiones = (() => {
             final, no como una pérdida sino como plata que no es tuya (ver más detalle en 📈 Informe de
             Inversiones).</p>`;
         }
+        if (moneda === "dolares") {
+          const aportesDolaresSel = aportesMoneda.filter((f) => seleccion.has(f.Plataforma));
+          const xirrSelUsd = rentabilidadXirrCapitalPropioUsd(aportesDolaresSel, valorSelPropio, historialTrm);
+          if (xirrSelUsd !== null) {
+            metricsHtml.push(metric("XIRR (selección, sobre capital propio, USD puro)", `${(xirrSelUsd * 100).toFixed(2)}%`));
+            avisoPropioHtml += `<p class="caption">"USD puro" no convierte nada a pesos -- cada aporte se pasa a
+              dólares con la TRM del día que lo hiciste, aislando el efecto cambiario de tu retorno real en
+              dólares.</p>`;
+          }
+        }
       }
       metricsDiv.innerHTML = metricsHtml.length ? metricsHtml.join("")
         : `<p class="caption">Elegí al menos una plataforma con aportes y valor para calcular.</p>`;
@@ -667,6 +779,19 @@ const PaginaInversiones = (() => {
 
     div.querySelectorAll(`.${claseChk}`).forEach((el) => el.addEventListener("change", recalcular));
     recalcular();
+
+    // El TWR (a diferencia del XIRR) no se puede filtrar por selección de
+    // cuentas -- las fotos guardadas son del valor TOTAL de la moneda, no
+    // por plataforma, así que esto siempre es sobre TODA la moneda.
+    const twrPropio = twrMoneda(historialValorCartera, aportesMoneda, moneda, historialTrm, true);
+    if (twrPropio && twrPropio.twrAnual !== null) {
+      div.querySelector(`#rentper_twr_${moneda}`).innerHTML = `
+        ${metric("TWR sobre capital propio (toda la moneda, anualizado)", `${(twrPropio.twrAnual * 100).toFixed(2)}%`)}
+        <p class="caption">A diferencia de las métricas de arriba, este no se puede filtrar por cuentas elegidas
+        -- es sobre TODA la cartera en esta moneda. Ponderado por tiempo (no le importa cuándo aportaste ni
+        cuándo tomaste margen), es lo más parecido a lo que tu bróker te muestra como "tu rentabilidad %".</p>
+      `;
+    }
   }
 
   function renderChartCrecimiento(canvas, serieValor, serieAportes, moneda, unidad) {

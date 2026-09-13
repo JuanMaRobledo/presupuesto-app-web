@@ -74,7 +74,7 @@ const MOCK_RANGES_BASE = {
     ["01/03/2025", "IBKR", "USD", "MSFT", "BUY", 2, 363.18, 1, 0, "Importado"],
   ],
   "'Datos de Mercado (Auto)'!A1:B10": [["TRM (USD/COP)", 4000]],
-  "'Historial de Valor de Cartera'!A2:E5000": [],
+  "'Historial de Valor de Cartera'!A2:F5000": [],
 };
 
 // ---------------------------------------------------------------------

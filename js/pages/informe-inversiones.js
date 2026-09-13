@@ -22,7 +22,7 @@ const PaginaInformeInversiones = (() => {
   const HISTORIAL_COLS = [
     "Fecha", "Plataforma", "Moneda", "Activo", "Operacion", "Cantidad", "Precio", "Comision", "ResultadoRealizado", "Fuente",
   ];
-  const VALOR_CARTERA_COLS = ["Fecha", "Moneda", "ValorCosto", "ValorActual", "AportesNetos"];
+  const VALOR_CARTERA_COLS = ["Fecha", "Moneda", "ValorCosto", "ValorActual", "AportesNetos", "ValorCapitalPropio"];
   const charts = {};
 
   const TIPOS_LIQUIDEZ = new Set(["Fiducuenta"]);
@@ -128,10 +128,41 @@ const PaginaInformeInversiones = (() => {
       const plataforma = idx === -1 ? ticker : ticker.slice(0, idx);
       const simbolo = idx === -1 ? ticker : ticker.slice(idx + 3);
       const costoTotal = toNumber(f.CostoTotal);
-      const gp = costoTotal ? (toNumber(f.GananciaPerdida) / costoTotal * 100) : 0;
-      return { ...f, Plataforma: plataforma, Ticker: simbolo, Etiqueta: `${simbolo} (${plataforma})`, GPpct: gp };
+      const valorActual = toNumber(f.ValorActual);
+      const gananciaPos = toNumber(f.GananciaPerdida);
+      const gp = costoTotal ? (gananciaPos / costoTotal * 100) : 0;
+      // Peso %: cuánto pesa esta posición sobre el valor total de títulos
+      // (concentración). Contribución %: cuánto puso ESTA posición de la
+      // ganancia/pérdida TOTAL de la cartera -- distinto de GPpct, que es
+      // el retorno de la posición sobre SU propio costo.
+      const pesoPct = valor ? (valorActual / valor * 100) : 0;
+      const contribucionPct = ganancia ? (gananciaPos / ganancia * 100) : 0;
+      return { ...f, Plataforma: plataforma, Ticker: simbolo, Etiqueta: `${simbolo} (${plataforma})`,
+               GPpct: gp, PesoPct: pesoPct, ContribucionPct: contribucionPct };
     });
     return { df: enriquecido, ajuste, costo, valor, ganancia, costoPropio: costo + ajuste, valorPropio: valor + ajuste };
+  }
+
+  // Puerto de _rentabilidad_xirr_capital_propio_usd() (app_presupuesto.py):
+  // XIRR de la cartera en dólares, en USD puro -- sin convertir nada a
+  // pesos. Cada aporte se convierte a dólares con la TRM HISTÓRICA de ESA
+  // fecha (no la de hoy), igual que twrMoneda()/analisisCambiarioDolares(),
+  // así el efecto cambiario queda aislado, no mezclado adentro de este
+  // número. El valor final ya es capital propio, en dólares.
+  function rentabilidadXirrCapitalPropioUsd(aportesDolares, valorCapitalPropioUsd, serieTrm) {
+    if (!serieTrm || !serieTrm.length) return null;
+    const flujos = [];
+    for (const f of aportesDolares) {
+      const fechaISO = parseFechaISO(f.Fecha);
+      const montoCop = toNumber(f.MontoTransferido);
+      if (!fechaISO || !montoCop) continue;
+      const trmFecha = trmEn(serieTrm, fechaISO);
+      if (!trmFecha) continue;
+      flujos.push({ fecha: fechaISO, monto: -montoCop / trmFecha });
+    }
+    if (valorCapitalPropioUsd) flujos.push({ fecha: new Date().toISOString().slice(0, 10), monto: valorCapitalPropioUsd });
+    if (flujos.length < 2 || !flujos.some((f) => f.monto < 0) || !flujos.some((f) => f.monto > 0)) return null;
+    return xirr(flujos);
   }
 
   // Nearest prior-or-equal: puerto de _precio_en()/_trm_en() (app_presupuesto.py)
@@ -156,10 +187,16 @@ const PaginaInformeInversiones = (() => {
   // devuelve null (TWR no disponible) en vez de calcular ignorando esos
   // flujos en silencio, que daría un número engañoso (trataría un aporte
   // grande como si fuera puro rendimiento de las posiciones).
-  function twrMoneda(historialValorCartera, aportes, moneda, serieTrm) {
+  // 'capitalPropio=true' usa ValorCapitalPropio (Valor Actual + liquidez,
+  // descuenta el margen prestado) en vez de ValorActual bruto -- no es
+  // retroactivo: fotos guardadas antes de que el Action escribiera esa
+  // columna quedan afuera (ValorCapitalPropio vacío/NaN), así que esta
+  // serie puede arrancar más tarde que la del TWR bruto.
+  function twrMoneda(historialValorCartera, aportes, moneda, serieTrm, capitalPropio = false) {
+    const campoValor = capitalPropio ? "ValorCapitalPropio" : "ValorActual";
     const snaps = historialValorCartera
-      .filter((f) => f.Moneda === moneda)
-      .map((f) => ({ fecha: parseFechaISO(f.Fecha), valor: toNumber(f.ValorActual) }))
+      .filter((f) => f.Moneda === moneda && (!capitalPropio || (f[campoValor] !== null && f[campoValor] !== "")))
+      .map((f) => ({ fecha: parseFechaISO(f.Fecha), valor: toNumber(f[campoValor]) }))
       .filter((f) => f.fecha)
       .sort((a, b) => a.fecha.localeCompare(b.fecha));
     // Una fecha puede repetirse si el Action corrió más de una vez el mismo
@@ -275,6 +312,8 @@ const PaginaInformeInversiones = (() => {
     // el margen prestado del valor final, no como pérdida sino como plata
     // que no es tuya (ver _rentabilidad_xirr_capital_propio(), app_presupuesto.py).
     const xirrPropio = rentabilidadXirrTodo(aportes, info.valorPropio, moneda, datos.trm);
+    const xirrPropioUsd = moneda === "dolares"
+      ? rentabilidadXirrCapitalPropioUsd(aportes, info.valorPropio, datos.historialTrm) : null;
 
     let html = `<h3>${nombre}</h3>`;
     html += `
@@ -306,10 +345,13 @@ const PaginaInformeInversiones = (() => {
     }
     filasMetricas.push(["XIRR (anualizado)", xirrVal !== null ? `${(xirrVal * 100).toFixed(1)}%` : "—", "Money-weighted: pondera CUÁNDO metiste cada peso, no solo cuánto. Ignora el margen prestado, igual que el retorno bruto."]);
     filasMetricas.push(["XIRR sobre capital propio", xirrPropio !== null ? `${(xirrPropio * 100).toFixed(1)}%` : "—", "Ídem, pero descontando el margen prestado del valor final -- no como una pérdida, sino como plata que no es tuya. Tu retorno real anualizado, ponderado por fecha."]);
+    if (moneda === "dolares") {
+      filasMetricas.push(["XIRR sobre capital propio (USD puro)", xirrPropioUsd !== null ? `${(xirrPropioUsd * 100).toFixed(1)}%` : "—", "Ídem, pero sin convertir nada a pesos -- cada aporte se pasa a dólares con la TRM del día que lo hiciste. Aísla el efecto cambiario (que se ve aparte, más abajo) de tu retorno real en dólares."]);
+    }
     const twr = twrMoneda(datos.historialValorCartera, aportes, moneda, datos.historialTrm);
     if (twr) {
       filasMetricas.push(["TWR (anualizado)", twr.twrAnual !== null ? `${(twr.twrAnual * 100).toFixed(1)}%` : "—",
-        `Time-weighted: encadena ${twr.nSubperiodos} sub-período(s) entre fotos guardadas — mide qué tan bien elegiste, no cuándo invertiste.`]);
+        `Time-weighted: encadena ${twr.nSubperiodos} sub-período(s) entre fotos guardadas — mide qué tan bien elegiste, no cuándo invertiste. Ignora el margen prestado, igual que el retorno bruto.`]);
       filasMetricas.push(["TWR del período (sin anualizar)", `${(twr.twrTotal * 100).toFixed(1)}%`, `Retorno acumulado en los últimos ${twr.dias} días entre fotos.`]);
       if (xirrVal !== null && twr.twrAnual !== null && Math.abs(xirrVal - twr.twrAnual) > 0.05) {
         const mejorCuando = twr.twrAnual > xirrVal ? "elegiste mejor de lo que sugiere el timing de tus aportes" : "el timing de tus aportes te ayudó más de lo que sugiere la calidad de tus elecciones";
@@ -319,6 +361,14 @@ const PaginaInformeInversiones = (() => {
       filasMetricas.push(["TWR", "—", "Necesita el histórico de TRM del GitHub Action ('Historial TRM (Auto)') — todavía no existe (¿corrió alguna vez con un aporte en dólares ya cargado?)."]);
     } else {
       filasMetricas.push(["TWR", "—", "Necesita al menos 2 fotos en 'Historial de Valor de Cartera' — se guardan solas cada vez que actualizás precios o posiciones/aportes."]);
+    }
+    const twrPropio = twrMoneda(datos.historialValorCartera, aportes, moneda, datos.historialTrm, true);
+    if (twrPropio && twrPropio.twrAnual !== null) {
+      filasMetricas.push(["TWR sobre capital propio (anualizado)", `${(twrPropio.twrAnual * 100).toFixed(1)}%`,
+        "Ídem, pero sobre capital propio -- lo más parecido a lo que tu bróker te muestra como \"tu rentabilidad %\": no le importa cuándo aportaste ni cuándo tomaste margen, solo qué tan bien le fue a tu plata invertida."]);
+    } else {
+      filasMetricas.push(["TWR sobre capital propio", "—",
+        "Necesita al menos 2 fotos CON capital propio guardado en 'Historial de Valor de Cartera' -- no es retroactivo, arranca desde la primera foto después de este cambio."]);
     }
     html += `<table class="tabla"><thead><tr><th>Métrica</th><th>Valor</th><th>Qué mide</th></tr></thead>
       <tbody>${filasMetricas.map((f) => `<tr><td>${f[0]}</td><td>${f[1]}</td><td>${f[2]}</td></tr>`).join("")}</tbody></table>`;
@@ -339,15 +389,20 @@ const PaginaInformeInversiones = (() => {
       <canvas id="ii_chart_gp_${moneda}" height="${Math.max(160, 28 * info.df.length)}"></canvas>
       <details>
         <summary>Ver las ${info.df.length} posiciones en detalle</summary>
+        <p class="caption"><strong>Peso %</strong>: cuánto pesa esta posición sobre el valor total de títulos
+        (concentración). <strong>Contribución %</strong>: cuánto puso ESTA posición de la ganancia/pérdida TOTAL
+        de la cartera -- distinto de G/P %, que es el retorno de la posición sobre SU propio costo.</p>
         <div class="tabla-scroll" style="max-height:350px;"><table class="tabla">
           <thead><tr><th>Ticker</th><th>Plataforma</th><th>Tipo</th><th>Cantidad</th><th>Precio Compra Prom.</th>
-            <th>Costo Total</th><th>Precio Actual</th><th>Valor Actual</th><th>Ganancia/Pérdida</th><th>G/P %</th></tr></thead>
+            <th>Costo Total</th><th>Precio Actual</th><th>Valor Actual</th><th>Ganancia/Pérdida</th><th>G/P %</th>
+            <th>Peso %</th><th>Contribución %</th></tr></thead>
           <tbody>${[...info.df].sort((a, b) => toNumber(b.ValorActual) - toNumber(a.ValorActual)).map((f) => `<tr>
             <td>${f.Ticker}</td><td>${f.Plataforma}</td><td>${f.Tipo}</td>
             <td>${toNumber(f.Cantidad).toLocaleString("en-US", { maximumFractionDigits: 4 })}</td>
             <td>${fmt(toNumber(f.PrecioCompra))}</td><td>${fmt(toNumber(f.CostoTotal))}</td>
             <td>${fmt(toNumber(f.PrecioActual))}</td><td>${fmt(toNumber(f.ValorActual))}</td>
             <td>${fmt(toNumber(f.GananciaPerdida))}</td><td>${f.GPpct.toFixed(1)}%</td>
+            <td>${f.PesoPct.toFixed(1)}%</td><td>${f.ContribucionPct.toFixed(1)}%</td>
           </tr>`).join("")}</tbody>
         </table></div>
       </details>
@@ -430,15 +485,47 @@ const PaginaInformeInversiones = (() => {
     charts[`comp_${moneda}`]?.destroy();
     charts[`comp_${moneda}`] = new Chart(div.querySelector(`#ii_chart_comp_${moneda}`).getContext("2d"), {
       type: "bar",
-      data: { labels: compOrdenado.map((f) => f.Etiqueta), datasets: [{ label: "Valor Actual", data: compOrdenado.map((f) => toNumber(f.ValorActual)), backgroundColor: "#4573d6" }] },
-      options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false } } },
+      data: { labels: compOrdenado.map((f) => f.Etiqueta),
+               datasets: [{ label: "Valor Actual", data: compOrdenado.map((f) => toNumber(f.ValorActual)), backgroundColor: "#1d4ed8" }] },
+      options: {
+        indexAxis: "y", responsive: true,
+        plugins: {
+          legend: { display: false },
+          title: { display: true, text: `Valor de mercado por posición (${unidad})` },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const f = compOrdenado[ctx.dataIndex];
+                return `${fmt(ctx.parsed.x)} — Peso: ${f.PesoPct.toFixed(1)}%`;
+              },
+            },
+          },
+        },
+        scales: { x: { title: { display: true, text: unidad }, ticks: { callback: (v) => fmt(v) } } },
+      },
     });
     const gpOrdenado = [...info.df].sort((a, b) => a.GPpct - b.GPpct);
     charts[`gp_${moneda}`]?.destroy();
     charts[`gp_${moneda}`] = new Chart(div.querySelector(`#ii_chart_gp_${moneda}`).getContext("2d"), {
       type: "bar",
-      data: { labels: gpOrdenado.map((f) => f.Etiqueta), datasets: [{ label: "G/P %", data: gpOrdenado.map((f) => f.GPpct), backgroundColor: gpOrdenado.map((f) => (f.GPpct >= 0 ? "#0ca30c" : "#d03b3b")) }] },
-      options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false } } },
+      data: { labels: gpOrdenado.map((f) => f.Etiqueta),
+               datasets: [{ label: "G/P %", data: gpOrdenado.map((f) => f.GPpct), backgroundColor: gpOrdenado.map((f) => (f.GPpct >= 0 ? "#0ca30c" : "#d03b3b")) }] },
+      options: {
+        indexAxis: "y", responsive: true,
+        plugins: {
+          legend: { display: false },
+          title: { display: true, text: "Retorno sobre costo por posición" },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const f = gpOrdenado[ctx.dataIndex];
+                return `${ctx.parsed.x >= 0 ? "+" : ""}${ctx.parsed.x.toFixed(1)}% — ${fmt(toNumber(f.GananciaPerdida))}`;
+              },
+            },
+          },
+        },
+        scales: { x: { title: { display: true, text: "Retorno sobre costo (%)" }, ticks: { callback: (v) => `${v}%` } } },
+      },
     });
   }
 

@@ -148,7 +148,7 @@ async function testFlujoCompletoUI() {
     "'Inversiones - Dólares'!A79:D1000": [],
     "'Historial de Inversiones'!A2:J5000": [],
     "'Datos de Mercado (Auto)'!A1:B10": [["TRM (USD/COP)", 4000]],
-    "'Historial de Valor de Cartera'!A2:E5000": [],
+    "'Historial de Valor de Cartera'!A2:F5000": [],
     "'Egresos - Efectivo'!A15:K1999": [
       ["2025-03", "05/03/2025", "PAGO PSE ACCIONES Y VAL", "COP", "1/1", 500000, 500000, 0, "Otros", "No", ""],
     ],

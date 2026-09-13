@@ -122,7 +122,7 @@ async function testConAction() {
       ["Benchmark Dólares", "S&P 500"],
       ["Benchmark Dólares Valor Shadow (USD)", 200],
     ],
-    "'Historial de Valor de Cartera'!A2:E5000": [
+    "'Historial de Valor de Cartera'!A2:F5000": [
       ["01/01/2026", "pesos", 150000, 180000, 150000],
       ["01/09/2026", "pesos", 200000, 220000, 200000],
       ["01/01/2026", "dolares", 150, 200, 150],

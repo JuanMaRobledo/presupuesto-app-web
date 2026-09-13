@@ -46,7 +46,7 @@ RANGO_POSICIONES = "A5:H45"
 RANGO_APORTES = "A79:D1000"
 
 SHEET_VALOR_CARTERA = "Historial de Valor de Cartera"
-VALOR_CARTERA_HEADERS = ["Fecha", "Moneda", "Valor Costo", "Valor Actual", "Aportes Netos"]
+VALOR_CARTERA_HEADERS = ["Fecha", "Moneda", "Valor Costo", "Valor Actual", "Aportes Netos", "Valor Capital Propio"]
 
 SHEET_DATOS_MERCADO = "Datos de Mercado (Auto)"
 
@@ -209,23 +209,27 @@ def valor_shadow_benchmark(moneda, flujos):
     return unidades * float(serie_precio.iloc[-1]), nombre
 
 
-def guardar_snapshot_cartera(sh, moneda, fecha, valor_costo, valor_actual, aportes_netos):
+def guardar_snapshot_cartera(sh, moneda, fecha, valor_costo, valor_actual, aportes_netos, valor_capital_propio):
     """Puerto de guardar_snapshot_cartera() (sheets_backend.py) -- crea la
     hoja si hace falta (self-healing, igual que el original) y actualiza en
     vez de duplicar si ya hay un snapshot de la misma fecha/moneda (evita
-    apilar uno por cada corrida del Action en el mismo día)."""
+    apilar uno por cada corrida del Action en el mismo día). 'Valor Capital
+    Propio' (columna F) es Valor Actual + liquidez (margen/efectivo
+    prestado descontado) -- alimenta el TWR sobre capital propio del lado
+    Python; no retroactivo, arranca desde la primera corrida del Action
+    después de este cambio."""
     try:
         ws = sh.worksheet(SHEET_VALOR_CARTERA)
     except gspread.exceptions.WorksheetNotFound:
-        ws = sh.add_worksheet(title=SHEET_VALOR_CARTERA, rows=2000, cols=5)
-        ws.update("A1:E1", [VALOR_CARTERA_HEADERS], value_input_option="RAW")
+        ws = sh.add_worksheet(title=SHEET_VALOR_CARTERA, rows=2000, cols=6)
+        ws.update("A1:F1", [VALOR_CARTERA_HEADERS], value_input_option="RAW")
     fecha_dd_mm = fecha.strftime("%d/%m/%Y")
-    existentes = _get_raw(ws, f"A2:E{max(ws.row_count, 2)}")
+    existentes = _get_raw(ws, f"A2:F{max(ws.row_count, 2)}")
     fila_existente = next((i for i, r in enumerate(existentes)
                             if r and _serial_to_text(r[0]) == fecha_dd_mm and len(r) > 1 and r[1] == moneda), None)
-    valores = [fecha.isoformat(), moneda, valor_costo, valor_actual, aportes_netos]
+    valores = [fecha.isoformat(), moneda, valor_costo, valor_actual, aportes_netos, valor_capital_propio]
     if fila_existente is not None:
-        ws.update(f"A{fila_existente + 2}:E{fila_existente + 2}", [valores], value_input_option="USER_ENTERED")
+        ws.update(f"A{fila_existente + 2}:F{fila_existente + 2}", [valores], value_input_option="USER_ENTERED")
     else:
         ws.append_rows([valores], value_input_option="USER_ENTERED")
 
@@ -331,6 +335,11 @@ def main():
         filas_pos = [f for f in posiciones_filas[moneda] if not es_cuenta_liquidez(f[0], f[1])]
         valor_costo = sum(abs(_num(f[2])) * _num(f[3]) for f in filas_pos)
         valor_actual = sum(_num(f[2]) * _num(f[5]) for f in filas_pos)
+        # Liquidez (Fiducuenta/efectivo-margen, negativa si es margen
+        # prestado) -- Valor Actual + esto = capital propio, para el TWR
+        # que sí lo descuenta (ver guardar_snapshot_cartera()).
+        filas_liquidez = [f for f in posiciones_filas[moneda] if es_cuenta_liquidez(f[0], f[1])]
+        valor_liquidez = sum(_num(f[2]) * _num(f[5]) for f in filas_liquidez)
 
         # Los aportes/retiros a una plataforma de liquidez (p. ej. Fiducuenta)
         # tienen que quedar afuera de este cálculo -- son la contraparte de
@@ -353,7 +362,8 @@ def main():
                 flujos.append((fecha.date(), monto))
 
         if valor_costo or valor_actual or aportes_netos:
-            guardar_snapshot_cartera(sh, moneda, date.today(), valor_costo, valor_actual, aportes_netos)
+            guardar_snapshot_cartera(sh, moneda, date.today(), valor_costo, valor_actual, aportes_netos,
+                                     valor_actual + valor_liquidez)
 
         shadow_por_moneda[moneda] = valor_shadow_benchmark(moneda, flujos)
         if moneda == "dolares":

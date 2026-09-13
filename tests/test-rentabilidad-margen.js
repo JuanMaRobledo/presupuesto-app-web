@@ -55,7 +55,7 @@ const MOCK_DOLARES_CON_MARGEN = {
   "'Datos de Mercado (Auto)'!A1:B10": [["TRM (USD/COP)", 4000]],
   "'Historial TRM (Auto)'!A2:B5000": [["2026-01-01", 4000]],
   "'Historial de Inversiones'!A2:J5000": [],
-  "'Historial de Valor de Cartera'!A2:E5000": [],
+  "'Historial de Valor de Cartera'!A2:F5000": [],
 };
 
 async function testXirrCapitalPropioInforme() {
@@ -165,10 +165,129 @@ async function testXirrCapitalPropioRentabilidadPersonalizada() {
   await browser.close();
 }
 
+// XIRR sobre capital propio en USD puro (Informe de Inversiones): el mismo
+// escenario de margen, pero verificando que la fila "(USD puro)" también
+// aparece y da un número calculado -- usa la TRM histórica de
+// 'Historial TRM (Auto)' (ya en MOCK_DOLARES_CON_MARGEN: 4000 el 2026-01-01),
+// sin ninguna conversión final a pesos.
+async function testXirrCapitalPropioUsdInforme() {
+  const MOCK_RANGES = {
+    "'Inversiones - Pesos'!A5:H45": [],
+    "'Inversiones - Pesos'!A79:D1000": [],
+    ...MOCK_DOLARES_CON_MARGEN,
+  };
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+
+  await setupMocks(page, MOCK_RANGES);
+  await gotoLoggedIn(page);
+  await page.click('.nav-btn:has-text("📈 Informe de Inversiones")');
+  await page.waitForTimeout(600);
+
+  const texto = await page.locator("#ii-contenido").innerText();
+  check(texto.includes("XIRR sobre capital propio (USD puro)"),
+    `Aparece la fila "XIRR sobre capital propio (USD puro)" (vi: "${texto.slice(0, 100)}")`);
+  const filaUsd = texto.match(/XIRR sobre capital propio \(USD puro\)\s*([+-]?[\d.]+)%/);
+  check(!!filaUsd, "Tiene un valor calculado, no \"—\"");
+  if (filaUsd) {
+    // Mismo escenario que el XIRR sobre capital propio en pesos (TRM
+    // constante en 4000 en todo el mock) -- debería dar prácticamente el
+    // mismo signo y magnitud, calculado directo en dólares.
+    check(parseFloat(filaUsd[1]) < 0, `Es negativo, mismo motivo que la versión en pesos (vi: ${filaUsd[1]}%)`);
+  }
+
+  await browser.close();
+}
+
+// TWR sobre capital propio: con 2 fotos donde el capital propio (Valor
+// Actual + liquidez) crece de 700 a 800 USD, el TWR tiene que dar
+// POSITIVO -- aunque el margen sigue restando, lo que importa acá es que
+// el capital propio en sí mejoró entre una foto y la siguiente.
+async function testTwrCapitalPropio() {
+  const MOCK_RANGES = {
+    "'Inversiones - Pesos'!A5:H45": [],
+    "'Inversiones - Pesos'!A79:D1000": [],
+    ...MOCK_DOLARES_CON_MARGEN,
+    "'Historial de Valor de Cartera'!A2:F5000": [
+      ["2026-01-01", "dolares", 900, 1000, 1000, 700],
+      ["2026-02-01", "dolares", 900, 1100, 1000, 800],
+    ],
+  };
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+
+  await setupMocks(page, MOCK_RANGES);
+  await gotoLoggedIn(page);
+  await page.click('.nav-btn:has-text("📈 Informe de Inversiones")');
+  await page.waitForTimeout(600);
+
+  const texto = await page.locator("#ii-contenido").innerText();
+  check(texto.includes("TWR sobre capital propio"), `Aparece la fila de TWR sobre capital propio (vi: "${texto.slice(0, 100)}")`);
+  const filaTwr = texto.match(/TWR sobre capital propio \(anualizado\)\s*([+-]?[\d.]+)%/);
+  check(!!filaTwr, `Tiene un valor calculado, no "—" (vi ausencia en: "${texto.slice(texto.indexOf("TWR sobre capital"), texto.indexOf("TWR sobre capital") + 60)}")`);
+  if (filaTwr) {
+    check(parseFloat(filaTwr[1]) > 0, `Es positivo -- el capital propio creció de 700 a 800 entre las 2 fotos (vi: ${filaTwr[1]}%)`);
+  }
+
+  // También en 📈 Inversiones -> Rentabilidad personalizada (toda la
+  // moneda, no filtrable por selección).
+  await page.click('.nav-btn:has-text("📈 Inversiones")');
+  await page.waitForTimeout(600);
+  const textoInv = await page.locator("#inv-contenido").innerText();
+  check(textoInv.includes("TWR sobre capital propio (toda la moneda, anualizado)"),
+    `También aparece en Rentabilidad personalizada (vi: "${textoInv.slice(textoInv.indexOf("Rentabilidad personalizada"), textoInv.indexOf("Rentabilidad personalizada") + 300)}")`);
+
+  await browser.close();
+}
+
+// Peso % / Contribución % por posición: con 2 posiciones de tamaños y
+// resultados distintos, cada columna nueva tiene que dar el número exacto
+// esperado -- no solo "aparece", sino que calcula bien.
+async function testPesoYContribucionPorPosicion() {
+  const MOCK_RANGES = {
+    "'Inversiones - Pesos'!A5:H45": [],
+    "'Inversiones - Pesos'!A79:D1000": [],
+    "'Inversiones - Dólares'!A5:H45": [
+      ["IBKR - MSFT", "Acción", 2, 450, 900, 550, 1100, 200],
+      ["IBKR - AAPL", "Acción", 1, 100, 100, 200, 200, 100],
+    ],
+    "'Inversiones - Dólares'!A79:D1000": [],
+    "'Datos de Mercado (Auto)'!A1:B10": [["TRM (USD/COP)", 4000]],
+    "'Historial TRM (Auto)'!A2:B5000": [],
+    "'Historial de Inversiones'!A2:J5000": [],
+    "'Historial de Valor de Cartera'!A2:F5000": [],
+  };
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+
+  await setupMocks(page, MOCK_RANGES);
+  await gotoLoggedIn(page);
+  await page.click('.nav-btn:has-text("📈 Informe de Inversiones")');
+  await page.waitForTimeout(600);
+
+  await page.click('#ii-contenido details summary:has-text("posiciones en detalle")');
+  const texto = await page.locator("#ii-contenido details").last().innerText();
+  // Valor total = 1100 + 200 = 1300. MSFT: Peso = 1100/1300 = 84.6%.
+  // Ganancia total = 200 + 100 = 300. MSFT: Contribución = 200/300 = 66.7%.
+  check(texto.includes("84.6%"), `Peso % de MSFT = 1100/1300 = 84.6% (vi: "${texto}")`);
+  check(texto.includes("66.7%"), `Contribución % de MSFT = 200/300 = 66.7% (vi: "${texto}")`);
+  // AAPL: Peso = 200/1300 = 15.4%. Contribución = 100/300 = 33.3%.
+  check(texto.includes("15.4%"), "Peso % de AAPL = 200/1300 = 15.4%");
+  check(texto.includes("33.3%"), "Contribución % de AAPL = 100/300 = 33.3%");
+
+  await browser.close();
+}
+
 (async () => {
   await testXirrCapitalPropioInforme();
   await testXirrUnificado();
   await testXirrCapitalPropioRentabilidadPersonalizada();
+  await testXirrCapitalPropioUsdInforme();
+  await testTwrCapitalPropio();
+  await testPesoYContribucionPorPosicion();
   console.log(failures === 0 ? "\nTODOS LOS TESTS PASARON" : `\n${failures} TEST(S) FALLARON`);
   process.exit(failures === 0 ? 0 : 1);
 })().catch((err) => {

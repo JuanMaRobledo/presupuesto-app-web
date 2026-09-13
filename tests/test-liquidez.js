@@ -72,7 +72,7 @@ async function testCasoReal() {
     ["Benchmark Dólares", "S&P 500"],
     ["Benchmark Dólares Valor Shadow (USD)", 7600.72],
   ],
-  "'Historial de Valor de Cartera'!A2:E5000": [
+  "'Historial de Valor de Cartera'!A2:F5000": [
     ["01/09/2026", "pesos", 2965929, 2838400, -17914000],
     ["01/09/2026", "dolares", 726.36, 991.26, 2000000],
   ],
@@ -194,7 +194,7 @@ async function testGuardSigueVivo() {
       ["Benchmark Dólares", "S&P 500"],
       ["Benchmark Dólares Valor Shadow (USD)", 0],
     ],
-    "'Historial de Valor de Cartera'!A2:E5000": [
+    "'Historial de Valor de Cartera'!A2:F5000": [
       ["01/09/2026", "pesos", 2965929, 2838400, -4000000],
     ],
   };
@@ -249,7 +249,7 @@ async function testRentabilidadFondoBanco() {
       ["Benchmark Dólares", "S&P 500"],
       ["Benchmark Dólares Valor Shadow (USD)", 0],
     ],
-    "'Historial de Valor de Cartera'!A2:E5000": [
+    "'Historial de Valor de Cartera'!A2:F5000": [
       ["01/09/2026", "pesos", 2965929, 2838400, 3000000],
     ],
   };
@@ -317,7 +317,7 @@ async function testXirrConAportesNetosNegativos() {
       ["Benchmark Dólares", "S&P 500"],
       ["Benchmark Dólares Valor Shadow (USD)", 0],
     ],
-    "'Historial de Valor de Cartera'!A2:E5000": [],
+    "'Historial de Valor de Cartera'!A2:F5000": [],
   };
 
   const browser = await chromium.launch();

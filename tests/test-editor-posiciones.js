@@ -63,7 +63,7 @@ async function testEditorPosiciones() {
     "'Inversiones - Dólares'!A79:D1000": [],
     "'Historial de Inversiones'!A2:J5000": [],
     "'Datos de Mercado (Auto)'!A1:B10": [["TRM (USD/COP)", 4000]],
-    "'Historial de Valor de Cartera'!A2:E5000": [],
+    "'Historial de Valor de Cartera'!A2:F5000": [],
   };
   const browser = await chromium.launch();
   const page = await browser.newPage();
@@ -166,7 +166,7 @@ async function testGuardarAccionesNoBorraFiducuenta() {
     "'Inversiones - Dólares'!A79:D1000": [],
     "'Historial de Inversiones'!A2:J5000": [],
     "'Datos de Mercado (Auto)'!A1:B10": [["TRM (USD/COP)", 4000]],
-    "'Historial de Valor de Cartera'!A2:E5000": [],
+    "'Historial de Valor de Cartera'!A2:F5000": [],
   };
   const browser = await chromium.launch();
   const page = await browser.newPage();
