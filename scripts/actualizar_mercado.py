@@ -12,6 +12,12 @@ escritos en el Google Sheet:
     valdrían hoy los mismos aportes puestos en el benchmark en vez de en la
     cartera real -- en una hoja nueva 'Datos de Mercado (Auto)' (puerto de
     _descargar_trm() / _valor_shadow_benchmark()).
+  - La serie diaria histórica de TRM (COP=X), desde el aporte en dólares
+    más antiguo, en una hoja nueva 'Historial TRM (Auto)' -- la web no
+    puede pedirle esto a Yahoo Finance ella misma (CORS), así que sin este
+    Action tampoco puede calcular el TWR en dólares ni el efecto cambiario
+    de los aportes (Streamlit sí puede, porque corre server-side y llama a
+    Yahoo Finance en el momento).
 
 La versión web (presupuesto-app-web) es 100% estática y solo lee esas tres
 hojas ya calculadas -- nunca llama a Yahoo Finance desde el navegador. Este
@@ -43,6 +49,9 @@ SHEET_VALOR_CARTERA = "Historial de Valor de Cartera"
 VALOR_CARTERA_HEADERS = ["Fecha", "Moneda", "Valor Costo", "Valor Actual", "Aportes Netos"]
 
 SHEET_DATOS_MERCADO = "Datos de Mercado (Auto)"
+
+SHEET_HISTORIAL_TRM = "Historial TRM (Auto)"
+HISTORIAL_TRM_HEADERS = ["Fecha", "TRM"]
 
 # Puerto de BENCHMARKS (app_presupuesto.py).
 BENCHMARKS = {"pesos": ("ICOLCAP.CL", "COLCAP"), "dolares": ("^GSPC", "S&P 500")}
@@ -243,6 +252,28 @@ def escribir_datos_mercado(sh, trm, trm_fecha, shadow_por_moneda):
     ws.update("A1:B7", filas, value_input_option="USER_ENTERED")
 
 
+def escribir_historial_trm(sh, serie_trm):
+    """Escribe (o crea) 'Historial TRM (Auto)' -- serie diaria de cierres
+    COP=X desde el aporte en dólares más antiguo. Se reescribe completa
+    cada corrida (no incremental): los datos son 100% reproducibles desde
+    Yahoo Finance, así que no hay nada real que perder al sobrescribir, y
+    evita la complejidad de un upsert día por día sobre una serie que
+    puede tener cientos de filas."""
+    if serie_trm.empty:
+        return
+    try:
+        ws = sh.worksheet(SHEET_HISTORIAL_TRM)
+    except gspread.exceptions.WorksheetNotFound:
+        ws = sh.add_worksheet(title=SHEET_HISTORIAL_TRM, rows=max(len(serie_trm) + 10, 100), cols=2)
+    filas = [[fecha.date().isoformat(), float(valor)] for fecha, valor in serie_trm.items()]
+    necesarias = len(filas) + 1
+    if ws.row_count < necesarias:
+        ws.add_rows(necesarias - ws.row_count)
+    ws.batch_clear([f"A2:B{max(ws.row_count, 2)}"])
+    ws.update("A1:B1", [HISTORIAL_TRM_HEADERS], value_input_option="RAW")
+    ws.update(f"A2:B{len(filas) + 1}", filas, value_input_option="USER_ENTERED")
+
+
 def main():
     creds_json = os.environ.get("GOOGLE_SERVICE_ACCOUNT_JSON")
     if not creds_json:
@@ -291,6 +322,7 @@ def main():
 
     # 4) Snapshot de cartera + valor shadow del benchmark, por moneda.
     shadow_por_moneda = {}
+    flujos_dolares = []
     for moneda, ws in posiciones_ws.items():
         # Snapshot de cartera = solo inversiones de mercado, sin cuentas de
         # liquidez (mismo criterio que separarPosiciones() del lado web) --
@@ -324,9 +356,20 @@ def main():
             guardar_snapshot_cartera(sh, moneda, date.today(), valor_costo, valor_actual, aportes_netos)
 
         shadow_por_moneda[moneda] = valor_shadow_benchmark(moneda, flujos)
+        if moneda == "dolares":
+            flujos_dolares = flujos
 
     # 5) 'Datos de Mercado (Auto)'.
     escribir_datos_mercado(sh, trm, trm_fecha, shadow_por_moneda)
+
+    # 6) 'Historial TRM (Auto)' -- serie diaria completa desde el aporte en
+    # dólares más antiguo, para que la web pueda calcular TWR en dólares y
+    # el efecto cambiario de los aportes (ambos necesitan la TRM de cada
+    # fecha de aporte, no solo la de hoy).
+    if flujos_dolares:
+        fecha_inicio_trm = min(f for f, _ in flujos_dolares)
+        serie_trm_historica = descargar_historico_cierre("COP=X", fecha_inicio_trm)
+        escribir_historial_trm(sh, serie_trm_historica)
 
     liquidez_omitidas = [str(f[0]) for filas in posiciones_filas.values() for f in filas
                          if f[0] and es_cuenta_liquidez(f[0], f[1])]
