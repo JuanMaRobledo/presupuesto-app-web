@@ -662,27 +662,65 @@ const PaginaInversiones = (() => {
   // (reportado por el usuario). Ahora cada cuenta/plataforma es una casilla
   // -- se puede ver una sola cuenta a la vez, o cualquier combinación, y el
   // resumen (Depósitos/Retiros/Flujo neto) y la tabla se filtran juntos.
+  // Fiducuenta vive en su propio bloque, aparte de las plataformas de
+  // inversión de verdad -- mismo motivo que separarPosiciones()/
+  // renderRentabilidadPersonalizada(): un depósito/retiro grande a
+  // Fiducuenta (p. ej. para pagar impuestos) distorsionaba el Depósitos/
+  // Retiros/Flujo neto "de las inversiones" cuando se mostraban juntos en
+  // la misma tabla (el bug original reportado por el usuario -- antes solo
+  // se separaba con una casilla dentro de la misma tabla, no en un bloque
+  // aparte).
   function renderAportesConFiltro(div, aportes, moneda) {
     if (!aportes.length) { div.innerHTML = `<p>Todavía no hay aportes registrados.</p>`; return; }
-    const plataformas = [...new Set(aportes.map((f) => f.Plataforma).filter(Boolean))].sort();
-    const claseChk = `chk_aportes_${moneda}`;
+    if (moneda !== "pesos") { div.innerHTML = bloqueAportesHTML(moneda, aportes, true); wireBloqueAportes(div, moneda, aportes, true); return; }
+
+    const esFiducuenta = (f) => f.Plataforma === PLATAFORMA_FONDO_BANCO;
+    const aportesInversion = aportes.filter((f) => !esFiducuenta(f));
+    const aportesFiducuenta = aportes.filter(esFiducuenta);
 
     div.innerHTML = `
-      <div class="checks-row">${plataformas.map((p) => `
+      <h5>Trii / Acciones y Valores — acciones y fondos</h5>
+      <div id="aportes_inv_${moneda}"></div>
+      <h5>Fiducuenta (reserva de impuestos)</h5>
+      <div id="aportes_fid_${moneda}"></div>
+    `;
+    const divInv = div.querySelector(`#aportes_inv_${moneda}`);
+    const divFid = div.querySelector(`#aportes_fid_${moneda}`);
+    divInv.innerHTML = bloqueAportesHTML(`${moneda}_inv`, aportesInversion, true);
+    wireBloqueAportes(divInv, `${moneda}_inv`, aportesInversion, true);
+    divFid.innerHTML = bloqueAportesHTML(`${moneda}_fid`, aportesFiducuenta, false);
+    wireBloqueAportes(divFid, `${moneda}_fid`, aportesFiducuenta, false);
+  }
+
+  // 'conCasillas': una casilla por plataforma para filtrar dentro del
+  // bloque (tiene sentido cuando hay varias plataformas -- Fiducuenta es
+  // una sola, así que su bloque no necesita casillas).
+  function bloqueAportesHTML(id, aportes, conCasillas) {
+    if (!aportes.length) return `<p class="caption">Todavía no hay aportes registrados acá.</p>`;
+    const plataformas = [...new Set(aportes.map((f) => f.Plataforma).filter(Boolean))].sort();
+    const claseChk = `chk_aportes_${id}`;
+    return `
+      ${conCasillas && plataformas.length > 1 ? `<div class="checks-row">${plataformas.map((p) => `
         <label style="margin-right:14px; white-space:nowrap;">
           <input type="checkbox" class="${claseChk}" value="${p}" checked> ${p}
         </label>
-      `).join("")}</div>
-      <div id="aportes_metrics_${moneda}" class="metric-row"></div>
-      <div id="aportes_tabla_${moneda}" class="tabla-scroll" style="max-height:300px;"></div>
+      `).join("")}</div>` : ""}
+      <div id="aportes_metrics_${id}" class="metric-row"></div>
+      <div id="aportes_tabla_${id}" class="tabla-scroll" style="max-height:260px;"></div>
     `;
+  }
 
-    const metricsDiv = div.querySelector(`#aportes_metrics_${moneda}`);
-    const tablaDiv = div.querySelector(`#aportes_tabla_${moneda}`);
+  function wireBloqueAportes(div, id, aportes, conCasillas) {
+    if (!aportes.length) return;
+    const claseChk = `chk_aportes_${id}`;
+    const metricsDiv = div.querySelector(`#aportes_metrics_${id}`);
+    const tablaDiv = div.querySelector(`#aportes_tabla_${id}`);
+    const hayCasillas = div.querySelectorAll(`.${claseChk}`).length > 0;
 
     function recalcular() {
-      const seleccion = new Set([...div.querySelectorAll(`.${claseChk}:checked`)].map((el) => el.value));
-      const filtrados = aportes.filter((f) => seleccion.has(f.Plataforma));
+      const filtrados = hayCasillas
+        ? aportes.filter((f) => [...div.querySelectorAll(`.${claseChk}:checked`)].map((el) => el.value).includes(f.Plataforma))
+        : aportes;
       const { dep, ret, neto } = resumenAportes(filtrados);
       metricsDiv.innerHTML = `
         ${metric("Depósitos", fmtMoneda(dep))}
@@ -696,10 +734,10 @@ const PaginaInversiones = (() => {
       });
       tablaDiv.innerHTML = `
         <table class="tabla">
-          <thead><tr><th>Fecha</th><th>Plataforma</th><th>Flujo</th><th>Monto</th><th>Notas</th></tr></thead>
+          <thead><tr><th>Fecha</th>${conCasillas ? "<th>Plataforma</th>" : ""}<th>Flujo</th><th>Monto</th><th>Notas</th></tr></thead>
           <tbody>${filas.map((f) => {
             const m = toNumber(f.MontoTransferido);
-            return `<tr><td>${f.Fecha ?? ""}</td><td>${f.Plataforma ?? ""}</td>
+            return `<tr><td>${f.Fecha ?? ""}</td>${conCasillas ? `<td>${f.Plataforma ?? ""}</td>` : ""}
               <td>${m >= 0 ? "Depósito" : "Retiro"}</td><td>${fmtMoneda(m)}</td><td>${f.Notas ?? ""}</td></tr>`;
           }).join("")}</tbody>
         </table>
