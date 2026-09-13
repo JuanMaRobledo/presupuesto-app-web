@@ -1,0 +1,47 @@
+name: Build app de escritorio
+
+# Compila los instaladores de la app de escritorio (desktop/, Electron):
+# Windows (.exe), Mac (.dmg) y Linux (.AppImage) -- cada uno en un runner
+# nativo de ese sistema operativo, porque no se pueden compilar de forma
+# cruzada (sobre todo el .dmg). Se dispara a mano (Actions → este workflow →
+# "Run workflow"), nunca en cada push -- los instaladores son pesados y no
+# hace falta uno por commit. Los 3 instaladores quedan como "Artifacts" del
+# run, descargables desde la pestaña Actions (30 días).
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artefacto: "*.exe"
+          - os: macos-latest
+            artefacto: "*.dmg"
+          - os: ubuntu-latest
+            artefacto: "*.AppImage"
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Compilar el instalador
+        run: npm run dist
+
+      - name: Subir el instalador como artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: presupuesto-app-desktop-${{ matrix.os }}
+          path: desktop/dist/${{ matrix.artefacto }}
+          if-no-files-found: error

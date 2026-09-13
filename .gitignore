@@ -19,5 +19,8 @@ venv/
 # Node (harness de pruebas -- Playwright, xlsx, pdfjs-dist; ver package.json)
 node_modules/
 
+# App de escritorio (Electron) -- binarios compilados, ver desktop/package.json
+desktop/dist/
+
 # Sistema
 .DS_Store

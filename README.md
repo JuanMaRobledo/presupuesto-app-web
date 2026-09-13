@@ -385,6 +385,21 @@ ejecución. Es la misma separación que ya describe la sección de arriba:
 Client ID de OAuth (público, vive en el código) vs. cuenta de servicio
 (secreta, nunca en el navegador).
 
+## Tests
+
+```bash
+npm install
+npx playwright install --with-deps chromium   # una sola vez
+python3 -m http.server 8123 &                 # la suite espera la app acá
+npm test
+```
+
+`tests/run-all.js` corre cada `tests/test-*.js` (18+ archivos, uno por
+feature) como proceso aparte y junta el resultado — cada uno mockea la API
+de Sheets, así que nada toca el Sheet real ni necesita ningún secret.
+`.github/workflows/tests.yml` corre lo mismo en cada push a `main` y en
+cada PR.
+
 ## Cómo probarlo en local
 
 ```bash
@@ -394,6 +409,52 @@ python3 -m http.server 8000
 
 Necesitás haber configurado el Client ID de Google primero (ver abajo) y
 haber agregado `http://localhost:8000` como origen autorizado.
+
+## App de escritorio (Electron)
+
+Dos formas de tener esto como una app instalada de verdad, no una pestaña
+del navegador:
+
+- **PWA (recomendado, ya andando sin nada que instalar aparte)**: en
+  Chrome/Edge, abrí `app.html` y usá "Instalar Presupuesto App" (ícono en
+  la barra de direcciones, o el menú ⋮) — queda con ícono y ventana
+  propios, sin barra del navegador. Ver "📲 Instalable como app propia
+  (PWA)" más arriba.
+- **`desktop/` (Electron)**: un ejecutable de verdad (.exe/.dmg/.AppImage),
+  para quien prefiera eso a una PWA. Es la MISMA web estática de este
+  repo, sin ningún cambio: `desktop/main.js` levanta un servidor HTTP
+  local en el puerto 8000 (el mismo origen que ya pedían autorizar las
+  instrucciones de "Cómo probarlo en local" de arriba — si ya lo
+  autorizaste alguna vez, esto funciona sin tocar nada más en Google Cloud
+  Console) y abre una ventana de Electron apuntando ahí. El login de
+  Google necesita un origen http(s) real, así que la ventana NO carga
+  `app.html` con `file://`.
+
+  Para correrla en tu computador:
+  ```bash
+  cd desktop
+  npm install
+  npm start
+  ```
+
+  Para generar el instalador de tu sistema (o el de otro, si tenés Wine/
+  Mac/Linux a mano — electron-builder no compila de forma cruzada para
+  Windows/Mac de verdad, mejor usar el workflow de GitHub Actions de
+  abajo):
+  ```bash
+  cd desktop
+  npm run dist   # deja el instalador en desktop/dist/
+  ```
+
+  El workflow `.github/workflows/desktop-build.yml` (disparalo a mano
+  desde la pestaña Actions → "Build app de escritorio" → "Run workflow")
+  compila los 3 instaladores (Windows/Mac/Linux) cada uno en un runner
+  nativo de ese sistema — no hace falta tener Windows o Mac para conseguir
+  el `.exe`/`.dmg`. Quedan como "Artifacts" del run, descargables durante
+  30 días. Los instaladores no están firmados (firmar cuesta un
+  certificado pago por plataforma) — Windows/Mac van a avisar "editor
+  desconocido" la primera vez que se abren; es esperable para una app de
+  uso personal, no un problema de seguridad real.
 
 ## Publicarlo en GitHub Pages
 
@@ -455,7 +516,15 @@ js/pages/*.js        — una página por sección, cada una expone render(contai
 scripts/actualizar_mercado.py — GitHub Action: precios/TRM/benchmarks vía
                          Yahoo Finance, corre server-side (ver "Actualizar
                          precios de mercado" más arriba)
+manifest.json, sw.js, icons/ — PWA (instalable en computador/celular, ver
+                         "Estado de la migración" más arriba)
+desktop/                — app de escritorio con Electron (ver "App de
+                         escritorio" más arriba) -- carga la misma web
+                         estática de acá, no la duplica
+tests/                  — suite de Playwright (ver "Tests" más abajo)
 .github/workflows/actualizar-mercado.yml — programación del Action de arriba
+.github/workflows/tests.yml — corre tests/ en cada push/PR
+.github/workflows/desktop-build.yml — compila los instaladores de desktop/ a mano
 ```
 
 Para portar una página nueva: agregar sus rangos a `RANGOS` en `config.js`,

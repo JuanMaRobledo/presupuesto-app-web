@@ -1,0 +1,45 @@
+{
+  "name": "presupuesto-app-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Presupuesto App como app de escritorio -- carga la misma web estática de este repo (app.html) en una ventana propia, sin backend ni build nuevo.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder"
+  },
+  "devDependencies": {
+    "electron": "37.6.0",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "com.presupuestoapp.desktop",
+    "productName": "Presupuesto App",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "..",
+        "to": "app",
+        "filter": [
+          "app.html",
+          "index.html",
+          "manifest.json",
+          "sw.js",
+          "css/**/*",
+          "js/**/*",
+          "icons/**/*"
+        ]
+      }
+    ],
+    "win": { "target": "nsis", "icon": "build/icon.png" },
+    "mac": { "target": "dmg", "icon": "build/icon.png", "category": "public.app-category.finance" },
+    "linux": { "target": "AppImage", "icon": "build/icon.png", "category": "Finance" }
+  }
+}
