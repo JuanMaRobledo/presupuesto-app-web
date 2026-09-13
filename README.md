@@ -212,19 +212,26 @@ GitHub Pages abre esa portada.
   `guardar_declaracion_renta()`. Es la primera sección con escritura del
   sitio: necesita el scope completo de Sheets + `drive.file` (ver más
   abajo).
-- 📈 Informe de Inversiones — **completo, salvo dos métricas en dólares**:
-  informe ejecutivo de lectura corrida (a diferencia de las herramientas
-  interactivas de 📈 Inversiones) — retorno bruto, capital propio (descuenta
-  el margen/efectivo de ambos lados) y XIRR por moneda, mejor/peor posición,
-  composición y G/P% por posición (gráficos), capital aportado por
-  plataforma, y operaciones cerradas (tasa de acierto, resultado realizado).
-  El TWR en dólares y el "Efecto cambiario de los aportes (TRM)" de
-  Streamlit NO están disponibles acá: ambos necesitan la TRM histórica día a
-  día de Yahoo Finance para convertir cada aporte en pesos a su equivalente
-  en dólares de esa fecha exacta, y un sitio estático no puede descargar eso
-  (CORS) — el GitHub Action de precios (`scripts/actualizar_mercado.py`)
-  todavía no guarda esa serie histórica en el Sheet, solo la TRM de hoy. El
-  TWR en pesos sí es 100% calculable acá (los aportes ya están en COP).
+- 📈 Informe de Inversiones — **completo**: informe ejecutivo de lectura
+  corrida (a diferencia de las herramientas interactivas de 📈 Inversiones)
+  — retorno bruto, capital propio (descuenta el margen/efectivo de ambos
+  lados), XIRR y TWR por moneda, mejor/peor posición, composición y G/P%
+  por posición (gráficos), capital aportado por plataforma, operaciones
+  cerradas (tasa de acierto, resultado realizado) y, en dólares, "💱 Efecto
+  cambiario de los aportes (TRM)" (cuánto ganaste/perdiste solo por el tipo
+  de cambio, aparte del rendimiento de las posiciones, más el "Retorno
+  combinado en pesos"). El TWR en dólares y el efecto cambiario necesitan
+  la TRM histórica día a día (convertir cada aporte en pesos a su
+  equivalente en dólares de la fecha exacta de esa transferencia) — un
+  sitio estático no puede descargarla de Yahoo Finance (CORS), así que
+  `scripts/actualizar_mercado.py` la trae server-side y la deja en la hoja
+  nueva `'Historial TRM (Auto)'` (serie diaria desde el aporte en dólares
+  más antiguo, se reescribe completa en cada corrida). Si esa hoja todavía
+  no existe (Action nunca corrió con este cambio, o nunca hubo un aporte
+  en dólares que la dispare), esas dos métricas puntuales quedan en "—"
+  con un aviso explicando por qué, sin romper el resto del informe — el
+  TWR en pesos nunca tuvo este problema (los aportes ya están en COP, no
+  necesitan conversión).
 - 📊 Informe de Presupuesto, Ingresos y Gastos — **completo**: informe
   ejecutivo que junta en un solo lugar lo que hoy está repartido entre
   Resumen/Análisis/Presupuesto — ingresos/gastos del alcance elegido (Total
@@ -319,11 +326,6 @@ GitHub Pages abre esa portada.
   actualizar precios, Crecimiento y Rentabilidad, agregar un dividendo/
   interés manual y editar el historial de operaciones ya están portados,
   ver más arriba.
-- Dentro de Informe de Inversiones: TWR en dólares y "Efecto cambiario de
-  los aportes (TRM)" — necesitan la TRM histórica día a día de Yahoo
-  Finance por aporte, que un sitio estático no puede descargar (CORS) y el
-  GitHub Action de precios todavía no guarda en el Sheet. El resto del
-  informe sí está portado, ver más arriba.
 
 Todo lo demás de la app, incluyendo el gráfico de "Tendencia de los últimos
 meses" de Resumen y Evolución/Año vs. Año de Análisis (las tres leen la hoja

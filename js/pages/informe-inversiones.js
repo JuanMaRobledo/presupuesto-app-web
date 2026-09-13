@@ -4,15 +4,16 @@
 // liquidez/inversión que el resto de la app (ver comentario de
 // js/pages/inversiones.js).
 //
-// NO disponible acá (a diferencia de Streamlit): el "Efecto cambiario de los
-// aportes (TRM)" y el TWR en dólares -- ambos necesitan la TRM HISTÓRICA día
-// a día de Yahoo Finance para convertir cada aporte en pesos a su
-// equivalente en dólares de esa fecha, y eso solo lo puede calcular un
-// GitHub Action (Yahoo Finance bloquea el acceso por CORS a un sitio
-// estático) -- el Action actual (scripts/actualizar_mercado.py) todavía no
-// guarda esa serie histórica en el Sheet, solo la TRM de hoy. El TWR en
-// pesos SÍ es 100% calculable acá (los aportes ya están en COP, no
-// necesitan conversión).
+// El TWR en dólares y el "Efecto cambiario de los aportes (TRM)" necesitan
+// la TRM HISTÓRICA día a día de Yahoo Finance (convertir cada aporte en
+// pesos a su equivalente en dólares de ESA fecha) -- un sitio estático no
+// puede pedirle eso a Yahoo Finance (CORS), así que scripts/
+// actualizar_mercado.py la descarga server-side y la deja en la hoja
+// 'Historial TRM (Auto)' (ver RANGOS.historial_trm). Si esa hoja todavía no
+// existe (el Action nunca corrió con este cambio, o nunca hubo un aporte en
+// dólares que la dispare), esas dos métricas quedan en "—"/ocultas en vez
+// de romper el resto del informe -- mismo criterio de degradación que ya
+// usa esta página cuando falta 'Datos de Mercado (Auto)'.
 const PaginaInformeInversiones = (() => {
   const APORTE_COLS = ["Fecha", "Plataforma", "MontoTransferido", "Notas"];
   const POSICION_COLS = [
@@ -44,6 +45,21 @@ const PaginaInformeInversiones = (() => {
     } catch (err) {
       console.warn("Todavía no hay datos de mercado del GitHub Action:", err.message);
     }
+    // Aparte del batchGet de arriba: si 'Historial TRM (Auto)' no existe
+    // (Action nunca corrió con esto, o nunca hubo aporte en dólares), que
+    // solo afecte a TWR-dólares/efecto cambiario, no a datos_mercado/
+    // historial_valor_cartera de arriba.
+    let historialTrm = [];
+    try {
+      const rawTrm = await SheetsApi.batchGet(["historial_trm"]);
+      historialTrm = (rawTrm.historial_trm || [])
+        .filter((r) => r && r[0])
+        .map((r) => ({ fechaISO: parseFechaISO(r[0]), valor: toNumber(r[1]) }))
+        .filter((r) => r.fechaISO)
+        .sort((a, b) => a.fechaISO.localeCompare(b.fechaISO));
+    } catch (err) {
+      console.warn("Todavía no hay histórico de TRM del GitHub Action:", err.message);
+    }
     return {
       aportesPesos: filasAObjetos(raw.aportes_inversion_pesos, APORTE_COLS, ["Fecha"]),
       aportesDolares: filasAObjetos(raw.aportes_inversion_dolares, APORTE_COLS, ["Fecha"]),
@@ -51,6 +67,7 @@ const PaginaInformeInversiones = (() => {
       posicionesDolares: filasAObjetos(raw.posiciones_dolares, POSICION_COLS),
       historial: filasAObjetos(raw.historial_inversion, HISTORIAL_COLS, ["Fecha"]),
       historialValorCartera,
+      historialTrm,
       trm,
     };
   }
@@ -117,12 +134,31 @@ const PaginaInformeInversiones = (() => {
     return { df: enriquecido, ajuste, costo, valor, ganancia, costoPropio: costo + ajuste, valorPropio: valor + ajuste };
   }
 
-  // Puerto de _twr_moneda("pesos") -- Modified Dietz encadenado entre fotos
-  // consecutivas de 'Historial de Valor de Cartera'; solo pesos (ver
-  // comentario de encabezado: dólares necesita TRM histórica, no disponible).
-  function twrPesos(historialValorCartera, aportesPesos) {
+  // Nearest prior-or-equal: puerto de _precio_en()/_trm_en() (app_presupuesto.py)
+  // -- 'serieTrm' ordenada ascendente por fechaISO. Si no hay ningún valor
+  // <= fechaISO (la fecha pedida es anterior a la serie entera), usa el
+  // primero, mismo fallback que Python.
+  function trmEn(serieTrm, fechaISO) {
+    let ultimo = null;
+    for (const p of serieTrm) {
+      if (p.fechaISO <= fechaISO) ultimo = p; else break;
+    }
+    return ultimo ? ultimo.valor : (serieTrm.length ? serieTrm[0].valor : null);
+  }
+
+  // Puerto de _twr_moneda(moneda) -- Modified Dietz encadenado entre fotos
+  // consecutivas de 'Historial de Valor de Cartera'. Para dólares, cada
+  // aporte (en pesos transferidos) se convierte a su equivalente en USD con
+  // la TRM histórica DE ESA FECHA (serieTrm). A diferencia de Python (que
+  // siempre puede descargar la TRM en el momento, server-side), acá "no hay
+  // serie" es un estado ESPERADO mientras el Action no haya corrido con
+  // este cambio -- si hay aportes reales en dólares para convertir, se
+  // devuelve null (TWR no disponible) en vez de calcular ignorando esos
+  // flujos en silencio, que daría un número engañoso (trataría un aporte
+  // grande como si fuera puro rendimiento de las posiciones).
+  function twrMoneda(historialValorCartera, aportes, moneda, serieTrm) {
     const snaps = historialValorCartera
-      .filter((f) => f.Moneda === "pesos")
+      .filter((f) => f.Moneda === moneda)
       .map((f) => ({ fecha: parseFechaISO(f.Fecha), valor: toNumber(f.ValorActual) }))
       .filter((f) => f.fecha)
       .sort((a, b) => a.fecha.localeCompare(b.fecha));
@@ -133,11 +169,19 @@ const PaginaInformeInversiones = (() => {
     const fechas = Object.keys(porFecha).sort();
     if (fechas.length < 2) return null;
 
+    const aportesValidos = aportes.filter((f) => parseFechaISO(f.Fecha) && toNumber(f.MontoTransferido));
+    if (moneda === "dolares" && aportesValidos.length && (!serieTrm || !serieTrm.length)) return null;
+
     const flujos = [];
-    for (const f of aportesPesos) {
+    for (const f of aportesValidos) {
       const fechaISO = parseFechaISO(f.Fecha);
-      const monto = toNumber(f.MontoTransferido);
-      if (fechaISO && monto) flujos.push({ fecha: fechaISO, monto });
+      let monto = toNumber(f.MontoTransferido);
+      if (moneda === "dolares") {
+        const trmFecha = trmEn(serieTrm, fechaISO);
+        if (!trmFecha) continue;
+        monto = monto / trmFecha;
+      }
+      flujos.push({ fecha: fechaISO, monto });
     }
 
     let factor = 1.0;
@@ -161,15 +205,34 @@ const PaginaInformeInversiones = (() => {
     return { twrTotal, twrAnual, dias: diasTotales, nSubperiodos: nSub, nSnapshots: fechas.length };
   }
 
+  // Puerto de _analisis_cambiario_dolares() -- para cada aporte en dólares,
+  // cuántos dólares equivalió con la TRM del día de esa transferencia, y
+  // cuántos pesos valdrían esos mismos dólares hoy con la TRM de hoy.
+  function analisisCambiarioDolares(aportesDolares, serieTrm, trmHoy) {
+    if (!aportesDolares.length || !serieTrm || !serieTrm.length || trmHoy === null) return null;
+    const filas = [];
+    for (const f of aportesDolares) {
+      const fechaISO = parseFechaISO(f.Fecha);
+      const montoCop = toNumber(f.MontoTransferido);
+      if (!fechaISO || !montoCop) continue;
+      const trmFecha = trmEn(serieTrm, fechaISO);
+      if (!trmFecha) continue;
+      const usdEquiv = montoCop / trmFecha;
+      const valorHoy = usdEquiv * trmHoy;
+      filas.push({ fecha: fechaISO, plataforma: f.Plataforma, montoCop, trmFecha, usdEquiv, valorHoy, diferencia: valorHoy - montoCop });
+    }
+    if (!filas.length) return null;
+    const totalCop = filas.reduce((s, f) => s + f.montoCop, 0);
+    const totalUsd = filas.reduce((s, f) => s + f.usdEquiv, 0);
+    const totalHoy = filas.reduce((s, f) => s + f.valorHoy, 0);
+    return { filas, totalCop, totalUsd, totalHoy, diferencia: totalHoy - totalCop, trmPromedio: totalUsd ? totalCop / totalUsd : null, trmHoy };
+  }
+
   async function render(container) {
     container.innerHTML = `
       <h1>📈 Informe de Inversiones</h1>
       <p class="caption">Resumen ejecutivo del portafolio en pesos y en dólares, por separado — posiciones,
       rentabilidad, composición y operaciones cerradas.</p>
-      <div class="aviso">El "Efecto cambiario de los aportes (TRM)" y el TWR en dólares de la versión de
-      Streamlit necesitan la TRM histórica día a día de Yahoo Finance, que un sitio estático no puede
-      descargar (CORS) y el GitHub Action de precios todavía no guarda — no están disponibles acá. El resto
-      del informe (retorno bruto, capital propio, XIRR, TWR en pesos, composición, operaciones cerradas) sí.</p>
       <div id="ii-contenido">Cargando datos del Sheet…</div>
     `;
     const contenido = container.querySelector("#ii-contenido");
@@ -236,21 +299,19 @@ const PaginaInformeInversiones = (() => {
       filasMetricas.push(["Retorno sobre capital propio", `${retornoPropio >= 0 ? "+" : ""}${retornoPropio.toFixed(1)}%`, "Ídem, descontando el margen prestado — tu retorno real sobre tu plata."]);
     }
     filasMetricas.push(["XIRR (anualizado)", xirrVal !== null ? `${(xirrVal * 100).toFixed(1)}%` : "—", "Money-weighted: pondera CUÁNDO metiste cada peso, no solo cuánto."]);
-    if (moneda === "pesos") {
-      const twr = twrPesos(datos.historialValorCartera, aportes);
-      if (twr) {
-        filasMetricas.push(["TWR (anualizado)", twr.twrAnual !== null ? `${(twr.twrAnual * 100).toFixed(1)}%` : "—",
-          `Time-weighted: encadena ${twr.nSubperiodos} sub-período(s) entre fotos guardadas — mide qué tan bien elegiste, no cuándo invertiste.`]);
-        filasMetricas.push(["TWR del período (sin anualizar)", `${(twr.twrTotal * 100).toFixed(1)}%`, `Retorno acumulado en los últimos ${twr.dias} días entre fotos.`]);
-        if (xirrVal !== null && twr.twrAnual !== null && Math.abs(xirrVal - twr.twrAnual) > 0.05) {
-          const mejorCuando = twr.twrAnual > xirrVal ? "elegiste mejor de lo que sugiere el timing de tus aportes" : "el timing de tus aportes te ayudó más de lo que sugiere la calidad de tus elecciones";
-          html += `<p class="caption">XIRR y TWR difieren bastante acá — probablemente ${mejorCuando}.</p>`;
-        }
-      } else {
-        filasMetricas.push(["TWR", "—", "Necesita al menos 2 fotos en 'Historial de Valor de Cartera' — se guardan solas cada vez que actualizás precios o posiciones/aportes."]);
+    const twr = twrMoneda(datos.historialValorCartera, aportes, moneda, datos.historialTrm);
+    if (twr) {
+      filasMetricas.push(["TWR (anualizado)", twr.twrAnual !== null ? `${(twr.twrAnual * 100).toFixed(1)}%` : "—",
+        `Time-weighted: encadena ${twr.nSubperiodos} sub-período(s) entre fotos guardadas — mide qué tan bien elegiste, no cuándo invertiste.`]);
+      filasMetricas.push(["TWR del período (sin anualizar)", `${(twr.twrTotal * 100).toFixed(1)}%`, `Retorno acumulado en los últimos ${twr.dias} días entre fotos.`]);
+      if (xirrVal !== null && twr.twrAnual !== null && Math.abs(xirrVal - twr.twrAnual) > 0.05) {
+        const mejorCuando = twr.twrAnual > xirrVal ? "elegiste mejor de lo que sugiere el timing de tus aportes" : "el timing de tus aportes te ayudó más de lo que sugiere la calidad de tus elecciones";
+        html += `<p class="caption">XIRR y TWR difieren bastante acá — probablemente ${mejorCuando}.</p>`;
       }
+    } else if (moneda === "dolares" && (!datos.historialTrm || !datos.historialTrm.length)) {
+      filasMetricas.push(["TWR", "—", "Necesita el histórico de TRM del GitHub Action ('Historial TRM (Auto)') — todavía no existe (¿corrió alguna vez con un aporte en dólares ya cargado?)."]);
     } else {
-      filasMetricas.push(["TWR", "—", "No disponible en dólares acá (necesita TRM histórica, ver aviso arriba)."]);
+      filasMetricas.push(["TWR", "—", "Necesita al menos 2 fotos en 'Historial de Valor de Cartera' — se guardan solas cada vez que actualizás precios o posiciones/aportes."]);
     }
     html += `<table class="tabla"><thead><tr><th>Métrica</th><th>Valor</th><th>Qué mide</th></tr></thead>
       <tbody>${filasMetricas.map((f) => `<tr><td>${f[0]}</td><td>${f[1]}</td><td>${f[2]}</td></tr>`).join("")}</tbody></table>`;
@@ -284,6 +345,78 @@ const PaginaInformeInversiones = (() => {
         </table></div>
       </details>
     `;
+
+    if (moneda === "dolares") {
+      html += `
+        <p><strong>💱 Efecto cambiario de los aportes (TRM)</strong></p>
+        <p class="caption">Cada peso que mandaste a IBKR/Binance/Hapi se convirtió a dólares a la TRM de ese día.
+        Si el dólar cayó desde entonces (menos pesos por dólar), esos mismos dólares valen menos pesos hoy que lo
+        que costó comprarlos — un efecto aparte del rendimiento de las posiciones en sí, que ya se mide en
+        dólares arriba (retorno bruto, capital propio, XIRR). Este cálculo es la TRM histórica día a día
+        guardada por el GitHub Action, no la tasa exacta de cada transferencia real.</p>
+      `;
+      const fx = analisisCambiarioDolares(aportes, datos.historialTrm, datos.trm);
+      if (!fx) {
+        html += `<p class="caption">No pude calcular el efecto cambiario — puede ser que no haya aportes
+          cargados acá todavía, o que 'Historial TRM (Auto)' no exista (el GitHub Action nunca corrió con un
+          aporte en dólares ya cargado).</p>`;
+      } else {
+        const pctFx = fx.totalCop ? (fx.diferencia / fx.totalCop * 100) : 0;
+        html += `
+          <div class="metric-row">
+            ${metric("Aportado (histórico)", fmtMoneda(fx.totalCop))}
+            ${metric("Equivalente en dólares al aportar", "US$ " + fx.totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2 }))}
+            ${metric("TRM promedio ponderado al aportar", fx.trmPromedio ? "$" + fx.trmPromedio.toLocaleString("en-US", { maximumFractionDigits: 0 }) : "—")}
+          </div>
+          <div class="metric-row">
+            ${metric("TRM de hoy", "$" + fx.trmHoy.toLocaleString("en-US", { maximumFractionDigits: 0 }))}
+            ${metric("Esos mismos dólares valen hoy", fmtMoneda(fx.totalHoy))}
+            ${metric("Efecto cambiario", `${fx.diferencia >= 0 ? "+" : ""}${fmtMoneda(fx.diferencia)} (${pctFx >= 0 ? "+" : ""}${pctFx.toFixed(1)}%)`)}
+          </div>
+        `;
+        if (fx.diferencia < 0) {
+          html += `<div class="aviso">⚠️ El dólar cayó frente al peso desde que hiciste estos aportes: en pesos
+            de hoy, perdiste ${fmtMoneda(Math.abs(fx.diferencia))} (${Math.abs(pctFx).toFixed(1)}%) solo por el
+            tipo de cambio, sin contar cómo les fue a las posiciones en sí.</div>`;
+        } else {
+          html += `<div class="aviso" style="background:#d1e7dd;color:#0f5132;">✅ El dólar subió frente al peso
+            desde que hiciste estos aportes: en pesos de hoy, ganaste ${fmtMoneda(fx.diferencia)}
+            (${pctFx.toFixed(1)}%) solo por el tipo de cambio, sin contar cómo les fue a las posiciones en
+            sí.</div>`;
+        }
+        if (fx.trmPromedio) {
+          const rUsdPct = capitalPropioValido ? retornoPropio : retornoBruto;
+          const rFx = fx.trmHoy / fx.trmPromedio - 1;
+          const rTotal = (1 + rUsdPct / 100) * (1 + rFx) - 1;
+          html += `
+            <p><strong>Retorno combinado en pesos (inversión ponderada por el tipo de cambio)</strong></p>
+            <div class="metric-row">
+              ${metric("Rendimiento en dólares", `${rUsdPct >= 0 ? "+" : ""}${rUsdPct.toFixed(1)}%`)}
+              ${metric("Efecto cambiario", `${rFx >= 0 ? "+" : ""}${(rFx * 100).toFixed(1)}%`)}
+              ${metric("Total combinado en pesos", `${rTotal >= 0 ? "+" : ""}${(rTotal * 100).toFixed(1)}%`)}
+            </div>
+            <p class="caption">Los dos efectos se combinan multiplicando, no sumando — (1 + rendimiento en
+            dólares) × (1 + efecto cambiario) − 1 — porque el segundo se aplica sobre el resultado del primero.
+            Esta es la cifra que de verdad importa si algún día convertís estos dólares de vuelta a pesos.</p>
+          `;
+        }
+        html += `
+          <details>
+            <summary>Ver el detalle por aporte</summary>
+            <div class="tabla-scroll" style="max-height:300px;"><table class="tabla">
+              <thead><tr><th>Fecha</th><th>Plataforma</th><th>Monto (COP)</th><th>TRM ese día</th>
+                <th>USD equivalente</th><th>TRM hoy</th><th>Valor hoy (COP)</th><th>Diferencia cambiaria</th></tr></thead>
+              <tbody>${fx.filas.map((f) => `<tr><td>${f.fecha}</td><td>${f.plataforma ?? ""}</td>
+                <td>${fmtMoneda(f.montoCop)}</td><td>$${f.trmFecha.toLocaleString("en-US", { maximumFractionDigits: 0 })}</td>
+                <td>US$ ${f.usdEquiv.toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
+                <td>$${fx.trmHoy.toLocaleString("en-US", { maximumFractionDigits: 0 })}</td>
+                <td>${fmtMoneda(f.valorHoy)}</td><td>${fmtMoneda(f.diferencia)}</td></tr>`).join("")}</tbody>
+            </table></div>
+          </details>
+        `;
+      }
+    }
+
     div.innerHTML = html;
 
     const compOrdenado = [...info.df].sort((a, b) => toNumber(a.ValorActual) - toNumber(b.ValorActual));

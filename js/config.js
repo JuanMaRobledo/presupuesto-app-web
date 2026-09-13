@@ -60,6 +60,11 @@ const RANGOS = {
   // PaginaInversiones.cargarDatos() (js/pages/inversiones.js).
   datos_mercado: "'Datos de Mercado (Auto)'!A1:B10",
   historial_valor_cartera: "'Historial de Valor de Cartera'!A2:E5000",
+  // La escribe scripts/actualizar_mercado.py (serie diaria de TRM desde el
+  // aporte en dólares más antiguo) -- no existe hasta el primer corrido
+  // DESPUÉS de que ese Action empezó a escribirla; puede seguir sin existir
+  // si nunca hubo un aporte en dólares. Ver PaginaInformeInversiones.
+  historial_trm: "'Historial TRM (Auto)'!A2:B5000",
   // Puerto de ranges["resumen_mensual"] (sheets_backend.py) -- B5:G30, fila 5
   // es el encabezado real de la hoja (confirmado leyendo el Sheet real:
   // Mes | Ingresos ganados | Gastos personales | Deudas y obligaciones |
