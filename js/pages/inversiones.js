@@ -636,9 +636,33 @@ const PaginaInversiones = (() => {
           moneda === "pesos" ? "Rentabilidad anualizada (XIRR, selección)" : "Rentabilidad anualizada (XIRR, selección, con TRM de hoy)",
           `${(xirrSel * 100).toFixed(2)}%`));
       }
+      // Si alguna plataforma elegida tiene su propia cuenta de Efectivo/
+      // Margen (p. ej. "Interactive Brokers - Efectivo/Margen") pero esa
+      // cuenta en sí no está marcada, se suma sola acá -- no hace falta
+      // que el usuario la busque y la marque a mano para ver el efecto del
+      // margen prestado en su selección.
+      const cuentasMargenRelacionadas = cuentas.filter((c) =>
+        c.endsWith(" - Efectivo/Margen") && seleccion.has(c.slice(0, -" - Efectivo/Margen".length)) && !seleccion.has(c));
+      let avisoPropioHtml = "";
+      if (cuentasMargenRelacionadas.length) {
+        const seleccionPropia = new Set([...seleccion, ...cuentasMargenRelacionadas]);
+        const valorSelPropio = posicionesMoneda
+          .filter((f) => seleccionPropia.has(claveCuenta(f)))
+          .reduce((s, f) => s + toNumber(f.ValorActual), 0);
+        const xirrSelPropio = rentabilidadXirr(aportesSel, valorSelPropio, moneda, trm);
+        if (xirrSelPropio !== null) {
+          metricsHtml.push(metric(
+            moneda === "pesos" ? "XIRR (selección, sobre capital propio)" : "XIRR (selección, sobre capital propio, con TRM de hoy)",
+            `${(xirrSelPropio * 100).toFixed(2)}%`));
+          avisoPropioHtml = `<p class="caption">"Sobre capital propio" suma también la cuenta de Efectivo/Margen
+            de cada plataforma elegida que tenga una -- descuenta el margen prestado por el bróker del valor
+            final, no como una pérdida sino como plata que no es tuya (ver más detalle en 📈 Informe de
+            Inversiones).</p>`;
+        }
+      }
       metricsDiv.innerHTML = metricsHtml.length ? metricsHtml.join("")
         : `<p class="caption">Elegí al menos una plataforma con aportes y valor para calcular.</p>`;
-      avisoDiv.innerHTML = avisoHtml;
+      avisoDiv.innerHTML = avisoHtml + avisoPropioHtml;
     }
 
     div.querySelectorAll(`.${claseChk}`).forEach((el) => el.addEventListener("change", recalcular));

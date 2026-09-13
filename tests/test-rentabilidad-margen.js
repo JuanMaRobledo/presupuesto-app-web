@@ -126,9 +126,49 @@ async function testXirrUnificado() {
   await browser.close();
 }
 
+// "Rentabilidad personalizada" (página 📈 Inversiones, no el Informe): con
+// "Interactive Brokers" seleccionado por defecto (y su cuenta de Efectivo/
+// Margen NO seleccionada, también por defecto), tiene que aparecer sola la
+// métrica "XIRR (selección, sobre capital propio...)" -- sin que el usuario
+// tenga que buscar y marcar la casilla de Efectivo/Margen a mano.
+async function testXirrCapitalPropioRentabilidadPersonalizada() {
+  const MOCK_RANGES = {
+    "'Inversiones - Pesos'!A5:H45": [],
+    "'Inversiones - Pesos'!A79:D1000": [],
+    ...MOCK_DOLARES_CON_MARGEN,
+  };
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+  page.on("console", (msg) => { if (msg.type() === "error") console.log("CONSOLE ERROR:", msg.text()); });
+
+  await setupMocks(page, MOCK_RANGES);
+  await gotoLoggedIn(page);
+  await page.click('.nav-btn:has-text("📈 Inversiones")');
+  await page.waitForTimeout(600);
+
+  const chkMargen = page.locator('input[type="checkbox"][value="Interactive Brokers - Efectivo/Margen"]');
+  check(await chkMargen.count() === 1, `Existe la casilla "Interactive Brokers - Efectivo/Margen" (vi ${await chkMargen.count()})`);
+  check(!(await chkMargen.isChecked()), "La casilla de Efectivo/Margen viene DESmarcada por defecto");
+
+  const texto = await page.locator("#inv-contenido").innerText();
+  check(texto.includes("XIRR (selección, sobre capital propio"),
+    `Aparece "XIRR (selección, sobre capital propio...)" sin marcar la casilla a mano (vi: "${texto.slice(texto.indexOf("Rentabilidad personalizada"), texto.indexOf("Rentabilidad personalizada") + 500)}")`);
+
+  const filaPropio = texto.match(/XIRR \(selección, sobre capital propio[^)]*\)\s*([+-]?[\d.]+)%/);
+  check(!!filaPropio, `El XIRR de la selección sobre capital propio tiene un valor calculado (vi: "${texto.slice(0, 50)}")`);
+  if (filaPropio) {
+    check(parseFloat(filaPropio[1]) < 0,
+      `Es negativo (800 USD de capital propio * TRM 4.000 = 3.200.000 < 4.000.000 aportado) (vi: ${filaPropio[1]}%)`);
+  }
+
+  await browser.close();
+}
+
 (async () => {
   await testXirrCapitalPropioInforme();
   await testXirrUnificado();
+  await testXirrCapitalPropioRentabilidadPersonalizada();
   console.log(failures === 0 ? "\nTODOS LOS TESTS PASARON" : `\n${failures} TEST(S) FALLARON`);
   process.exit(failures === 0 ? 0 : 1);
 })().catch((err) => {
