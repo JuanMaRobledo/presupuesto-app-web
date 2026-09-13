@@ -105,8 +105,13 @@ de Google a los logins dentro de ventanas empotradas.
   muestran separados en todos lados: Posiciones (una tabla por grupo, con
   sus propias métricas de Costo/Valor/Ganancia), Patrimonio unificado
   (desglose Acciones vs. Fondos de Inversión en COP, más el bloque aparte
-  de liquidez), y Liquidez no cuenta para XIRR/Rentabilidad/Comparación
-  contra benchmark. Tanto la tabla de "Depósitos y retiros" de arriba de
+  de liquidez, que ahora también trae su propio "📐 Rentabilidad unificada"
+  — un solo XIRR combinando pesos y dólares SOBRE CAPITAL PROPIO, es decir
+  restando el margen/efectivo prestado de ambas monedas del valor final, no
+  como una pérdida sino como plata que no es tuya), y Liquidez no cuenta
+  para el Retorno bruto/simple ni para la Comparación contra benchmark de
+  cada moneda por separado, pero sí para el XIRR sobre capital propio (por
+  moneda y unificado). Tanto la tabla de "Depósitos y retiros" de arriba de
   todo como "🎛️ Rentabilidad personalizada" tienen una casilla por cuenta
   (Acciones y Valores, Trii, Fiducuenta, Plenti, Binance, Hapi, Interactive
   Brokers, y el efectivo/margen de cada broker aparte de sus acciones —
@@ -223,7 +228,9 @@ de Google a los logins dentro de ventanas empotradas.
 - 📈 Informe de Inversiones — **completo**: informe ejecutivo de lectura
   corrida (a diferencia de las herramientas interactivas de 📈 Inversiones)
   — retorno bruto, capital propio (descuenta el margen/efectivo de ambos
-  lados), XIRR y TWR por moneda, mejor/peor posición, composición y G/P%
+  lados), XIRR **y XIRR sobre capital propio** (el margen prestado se
+  descuenta del valor final, no de la ganancia — no es una pérdida, es
+  plata que no es tuya) y TWR por moneda, mejor/peor posición, composición y G/P%
   por posición (gráficos), capital aportado por plataforma, operaciones
   cerradas (tasa de acierto, resultado realizado) y, en dólares, "💱 Efecto
   cambiario de los aportes (TRM)" (cuánto ganaste/perdiste solo por el tipo

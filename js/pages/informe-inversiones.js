@@ -270,6 +270,11 @@ const PaginaInformeInversiones = (() => {
     // reales, no hace falta tocarlos) -- si el GitHub Action de precios
     // todavía no corrió, no hay TRM y el XIRR en dólares queda "—".
     const xirrVal = rentabilidadXirrTodo(aportes, info.valor, moneda, datos.trm);
+    // Mismo rentabilidadXirrTodo(), pero contra el valor de capital propio
+    // (acciones+fondos+liquidez) en vez de solo acciones+fondos -- descuenta
+    // el margen prestado del valor final, no como pérdida sino como plata
+    // que no es tuya (ver _rentabilidad_xirr_capital_propio(), app_presupuesto.py).
+    const xirrPropio = rentabilidadXirrTodo(aportes, info.valorPropio, moneda, datos.trm);
 
     let html = `<h3>${nombre}</h3>`;
     html += `
@@ -287,8 +292,9 @@ const PaginaInformeInversiones = (() => {
     if (Math.abs(info.ajuste) > 1) {
       const motivo = info.ajuste < 0 ? "margen prestado por el bróker" : "efectivo sin invertir";
       html += `<p class="caption">Hay ${fmt(Math.abs(info.ajuste))} de ${motivo} mezclados en el valor de la
-        cuenta, fuera de las posiciones. El retorno bruto de arriba lo ignora — compará mejor contra "Capital
-        propio", que sí lo descuenta de los dos lados, o contra el XIRR.</p>`;
+        cuenta, fuera de las posiciones. El retorno bruto y el XIRR de arriba lo ignoran — compará mejor contra
+        "Capital propio" o, mejor todavía, contra "XIRR sobre capital propio" (más abajo, en Métricas de
+        rendimiento), que descuenta el margen prestado Y pondera por fecha a la vez.</p>`;
     }
 
     html += `<p><strong>📐 Métricas de rendimiento</strong></p>`;
@@ -298,7 +304,8 @@ const PaginaInformeInversiones = (() => {
     if (capitalPropioValido) {
       filasMetricas.push(["Retorno sobre capital propio", `${retornoPropio >= 0 ? "+" : ""}${retornoPropio.toFixed(1)}%`, "Ídem, descontando el margen prestado — tu retorno real sobre tu plata."]);
     }
-    filasMetricas.push(["XIRR (anualizado)", xirrVal !== null ? `${(xirrVal * 100).toFixed(1)}%` : "—", "Money-weighted: pondera CUÁNDO metiste cada peso, no solo cuánto."]);
+    filasMetricas.push(["XIRR (anualizado)", xirrVal !== null ? `${(xirrVal * 100).toFixed(1)}%` : "—", "Money-weighted: pondera CUÁNDO metiste cada peso, no solo cuánto. Ignora el margen prestado, igual que el retorno bruto."]);
+    filasMetricas.push(["XIRR sobre capital propio", xirrPropio !== null ? `${(xirrPropio * 100).toFixed(1)}%` : "—", "Ídem, pero descontando el margen prestado del valor final -- no como una pérdida, sino como plata que no es tuya. Tu retorno real anualizado, ponderado por fecha."]);
     const twr = twrMoneda(datos.historialValorCartera, aportes, moneda, datos.historialTrm);
     if (twr) {
       filasMetricas.push(["TWR (anualizado)", twr.twrAnual !== null ? `${(twr.twrAnual * 100).toFixed(1)}%` : "—",

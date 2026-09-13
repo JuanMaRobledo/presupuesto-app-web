@@ -205,6 +205,25 @@ const PaginaInversiones = (() => {
     return xirr(flujos);
   }
 
+  // Puerto de _rentabilidad_xirr_unificada() (app_presupuesto.py): un solo
+  // XIRR combinando pesos y dólares, sobre capital propio de ambas monedas.
+  // Los aportes de ambas hojas ya están en pesos transferidos, así que se
+  // juntan tal cual; solo el valor final en dólares necesita convertirse
+  // con la TRM de hoy.
+  function rentabilidadXirrUnificada(aportesPesos, aportesDolares, capitalPropioPesos, capitalPropioDolares, trm) {
+    if (trm === null) return null;
+    const flujos = [];
+    for (const f of [...aportesPesos, ...aportesDolares]) {
+      const fechaISO = parseFechaISO(f.Fecha);
+      const monto = toNumber(f.MontoTransferido);
+      if (fechaISO && monto) flujos.push({ fecha: fechaISO, monto: -monto });
+    }
+    const valorFinal = capitalPropioPesos + capitalPropioDolares * trm;
+    if (valorFinal) flujos.push({ fecha: new Date().toISOString().slice(0, 10), monto: valorFinal });
+    if (flujos.length < 2 || !flujos.some((f) => f.monto < 0) || !flujos.some((f) => f.monto > 0)) return null;
+    return xirr(flujos);
+  }
+
   function patrimonioTotal(posiciones) {
     return posiciones.reduce((s, f) => s + toNumber(f.ValorActual), 0);
   }
@@ -392,12 +411,26 @@ const PaginaInversiones = (() => {
       <p class="caption">TRM $${trm.toLocaleString("en-US", { maximumFractionDigits: 2 })} COP/USD
       (${datos.mercado.trmFecha || "sin fecha"}) — la actualiza un GitHub Action programado (no en vivo desde el
       navegador: Yahoo Finance bloquea ese acceso por CORS a un sitio estático).</p>
+      <h5>📐 Rentabilidad unificada</h5>
+      <p class="caption">Un solo XIRR combinando los aportes/retiros de pesos y dólares (los de dólares ya
+      están registrados en pesos transferidos, así que se juntan sin convertir nada) contra el valor final de
+      ambas carteras hoy, convertido a pesos con la TRM de hoy. Sobre <strong>capital propio</strong> —
+      descuenta el margen prestado por el bróker del valor final en cualquiera de las dos monedas (no como una
+      pérdida, sino como plata que no es tuya).</p>
+      <div class="metric-row">
+        ${metric("XIRR unificado (pesos + dólares, sobre capital propio)",
+          (() => {
+            const xirrUnificado = rentabilidadXirrUnificada(datos.aportesPesos, datos.aportesDolares,
+              patrimonioPesos + cajaPesos, patrimonioDolares + cajaDolares, trm);
+            return xirrUnificado !== null ? `${(xirrUnificado * 100).toFixed(1)}%` : "—";
+          })())}
+      </div>
       ${hayLiquidez ? `
         <h5>💰 Efectivo, margen y cuentas de liquidez</h5>
         <p class="caption">Aparte de las inversiones de arriba — efectivo/deuda de margen en el broker y
         la Fiducuenta (reserva de impuestos), sin retorno de mercado. Un valor negativo es
-        financiación del broker (deuda), no una pérdida. No cuenta para "Total en inversiones" ni para las
-        métricas de rentabilidad de abajo.</p>
+        financiación del broker (deuda), no una pérdida. No cuenta para "Total en inversiones", pero SÍ se
+        descuenta en el XIRR unificado de arriba (sobre capital propio).</p>
         <div class="metric-row">
           ${metric("Pesos (COP)", fmtMoneda(cajaPesos))}
           ${metric(`Dólares → COP (TRM $${trm.toLocaleString("en-US", { maximumFractionDigits: 0 })})`, fmtMoneda(cajaDolaresCop))}
