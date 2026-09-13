@@ -271,7 +271,22 @@ de Google a los logins dentro de ventanas empotradas.
   en dólares que la dispare), esas dos métricas puntuales quedan en "—"
   con un aviso explicando por qué, sin romper el resto del informe — el
   TWR en pesos nunca tuvo este problema (los aportes ya están en COP, no
-  necesitan conversión).
+  necesitan conversión). Reorganizado en paneles colapsables (`.panel-
+  colapsable`, css/style.css) — "📐 Métricas de rendimiento", "📊 Gráficos y
+  detalle por posición" y "💱 Efecto cambiario" quedan agrupados y se
+  pueden cerrar para no saturar la pantalla (vienen abiertos por defecto,
+  mismo contenido de siempre). Dentro de "Gráficos y detalle", una casilla
+  por plataforma (si hay más de una) filtra en vivo ambos gráficos y la
+  tabla de detalle — "Mejor/Peor posición" queda afuera del filtro a
+  propósito, son sobre TODA la cartera de esa moneda (mismo criterio que
+  Peso %/Contribución %, que tampoco recalculan sobre lo filtrado). Montos
+  en dólares SIEMPRE con 2 decimales (`fmtUsd()`, js/util.js) — un
+  `toLocaleString` sin `maximumFractionDigits` explícito podía mostrar 3
+  decimales con ruido de punto flotante (p. ej. "US$ 12,704.116"). Un XIRR
+  anualizado calculado sobre menos de 90 días de historial (desde el
+  primer aporte/retiro de esa moneda) trae un aviso explicando que
+  anualizar una ventana tan corta amplifica muchísimo cualquier variación
+  — no es un error de cálculo.
 - 📊 Informe de Presupuesto, Ingresos y Gastos — **completo**: informe
   ejecutivo que junta en un solo lugar lo que hoy está repartido entre
   Resumen/Análisis/Presupuesto — ingresos/gastos del alcance elegido (Total

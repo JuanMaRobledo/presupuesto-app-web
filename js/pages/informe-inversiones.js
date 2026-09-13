@@ -363,7 +363,7 @@ const PaginaInformeInversiones = (() => {
         rendimiento), que descuenta el margen prestado Y pondera por fecha a la vez.</p>`;
     }
 
-    html += `<p><strong>📐 Métricas de rendimiento</strong></p>`;
+    html += `<details class="panel-colapsable" open><summary>📐 Métricas de rendimiento</summary><div class="panel-colapsable-body">`;
     const filasMetricas = [
       ["Retorno simple (bruto)", `${retornoBruto >= 0 ? "+" : ""}${retornoBruto.toFixed(1)}%`, "Ganancia / costo de las posiciones — sin apalancamiento, sin importar fechas."],
     ];
@@ -398,46 +398,41 @@ const PaginaInformeInversiones = (() => {
         "Necesita al menos 2 fotos CON capital propio guardado en 'Historial de Valor de Cartera' -- no es retroactivo, arranca desde la primera foto después de este cambio."]);
     }
     html += `<table class="tabla"><thead><tr><th>Métrica</th><th>Valor</th><th>Qué mide</th></tr></thead>
-      <tbody>${filasMetricas.map((f) => `<tr><td>${f[0]}</td><td>${f[1]}</td><td>${f[2]}</td></tr>`).join("")}</tbody></table>`;
+      <tbody>${filasMetricas.map((f) => `<tr><td>${f[0]}</td><td>${f[1]}</td><td>${f[2]}</td></tr>`).join("")}</tbody></table>
+      </div></details>`;
 
     const mejor = [...info.df].sort((a, b) => b.GPpct - a.GPpct)[0];
     const peor = [...info.df].sort((a, b) => a.GPpct - b.GPpct)[0];
-    const multiPlataforma = new Set(info.df.map((f) => f.Plataforma)).size > 1;
+    const plataformas = [...new Set(info.df.map((f) => f.Plataforma))].sort();
+    const multiPlataforma = plataformas.length > 1;
     const etiquetaPos = (f) => (multiPlataforma ? `${f.Ticker} (${f.Plataforma})` : f.Ticker);
+    const claseChkPlat = `ii_chk_plat_${moneda}`;
     html += `
-      <div class="metric-row">
-        ${metric("Mejor posición", `${etiquetaPos(mejor)} (${mejor.GPpct >= 0 ? "+" : ""}${mejor.GPpct.toFixed(1)}%)`)}
-        ${metric("Peor posición", `${etiquetaPos(peor)} (${peor.GPpct >= 0 ? "+" : ""}${peor.GPpct.toFixed(1)}%)`)}
-      </div>
-      <p class="caption">${info.df.length} posiciones activas.</p>
-      <p><strong>Composición por posición (valor actual)</strong></p>
-      <canvas id="ii_chart_comp_${moneda}" height="${Math.max(160, 28 * info.df.length)}"></canvas>
-      <p><strong>Ganancia/pérdida por posición</strong></p>
-      <canvas id="ii_chart_gp_${moneda}" height="${Math.max(160, 28 * info.df.length)}"></canvas>
-      <details>
-        <summary>Ver las ${info.df.length} posiciones en detalle</summary>
-        <p class="caption"><strong>Peso %</strong>: cuánto pesa esta posición sobre el valor total de títulos
-        (concentración). <strong>Contribución %</strong>: cuánto puso ESTA posición de la ganancia/pérdida TOTAL
-        de la cartera -- distinto de G/P %, que es el retorno de la posición sobre SU propio costo.</p>
-        <div class="tabla-scroll" style="max-height:350px;"><table class="tabla">
-          <thead><tr><th>Ticker</th><th>Plataforma</th><th>Tipo</th><th>Cantidad</th><th>Precio Compra Prom.</th>
-            <th>Costo Total</th><th>Precio Actual</th><th>Valor Actual</th><th>Ganancia/Pérdida</th><th>G/P %</th>
-            <th>Peso %</th><th>Contribución %</th></tr></thead>
-          <tbody>${[...info.df].sort((a, b) => toNumber(b.ValorActual) - toNumber(a.ValorActual)).map((f) => `<tr>
-            <td>${f.Ticker}</td><td>${f.Plataforma}</td><td>${f.Tipo}</td>
-            <td>${toNumber(f.Cantidad).toLocaleString("en-US", { maximumFractionDigits: 4 })}</td>
-            <td>${fmt(toNumber(f.PrecioCompra))}</td><td>${fmt(toNumber(f.CostoTotal))}</td>
-            <td>${fmt(toNumber(f.PrecioActual))}</td><td>${fmt(toNumber(f.ValorActual))}</td>
-            <td>${fmt(toNumber(f.GananciaPerdida))}</td><td>${f.GPpct.toFixed(1)}%</td>
-            <td>${f.PesoPct.toFixed(1)}%</td><td>${f.ContribucionPct.toFixed(1)}%</td>
-          </tr>`).join("")}</tbody>
-        </table></div>
+      <details class="panel-colapsable" open>
+        <summary>📊 Gráficos y detalle por posición</summary>
+        <div class="panel-colapsable-body">
+          <div class="metric-row">
+            ${metric("Mejor posición", `${etiquetaPos(mejor)} (${mejor.GPpct >= 0 ? "+" : ""}${mejor.GPpct.toFixed(1)}%)`)}
+            ${metric("Peor posición", `${etiquetaPos(peor)} (${peor.GPpct >= 0 ? "+" : ""}${peor.GPpct.toFixed(1)}%)`)}
+          </div>
+          ${multiPlataforma ? `
+            <div class="filtro-chart">
+              <div class="filtro-chart-titulo">Filtrar gráficos y tabla por plataforma</div>
+              <div class="checks-row">${plataformas.map((p) => `
+                <label style="white-space:nowrap;"><input type="checkbox" class="${claseChkPlat}" value="${p}" checked> ${p}</label>
+              `).join("")}</div>
+            </div>` : ""}
+          <p class="caption" id="ii_conteo_${moneda}">${info.df.length} posiciones activas.</p>
+          <div id="ii_grafico_detalle_${moneda}"></div>
+        </div>
       </details>
     `;
 
     if (moneda === "dolares") {
       html += `
-        <p><strong>💱 Efecto cambiario de los aportes (TRM)</strong></p>
+        <details class="panel-colapsable" open>
+        <summary>💱 Efecto cambiario de los aportes (TRM)</summary>
+        <div class="panel-colapsable-body">
         <p class="caption">Cada peso que mandaste a IBKR/Binance/Hapi se convirtió a dólares a la TRM de ese día.
         Si el dólar cayó desde entonces (menos pesos por dólar), esos mismos dólares valen menos pesos hoy que lo
         que costó comprarlos — un efecto aparte del rendimiento de las posiciones en sí, que ya se mide en
@@ -504,56 +499,109 @@ const PaginaInformeInversiones = (() => {
           </details>
         `;
       }
+      html += `</div></details>`;
     }
 
     div.innerHTML = html;
 
-    const compOrdenado = [...info.df].sort((a, b) => toNumber(a.ValorActual) - toNumber(b.ValorActual));
-    charts[`comp_${moneda}`]?.destroy();
-    charts[`comp_${moneda}`] = new Chart(div.querySelector(`#ii_chart_comp_${moneda}`).getContext("2d"), {
-      type: "bar",
-      data: { labels: compOrdenado.map((f) => f.Etiqueta),
-               datasets: [{ label: "Valor Actual", data: compOrdenado.map((f) => toNumber(f.ValorActual)), backgroundColor: "#1d4ed8" }] },
-      options: {
-        indexAxis: "y", responsive: true,
-        plugins: {
-          legend: { display: false },
-          title: { display: true, text: `Valor de mercado por posición (${unidad})` },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => {
-                const f = compOrdenado[ctx.dataIndex];
-                return `${fmt(ctx.parsed.x)} — Peso: ${f.PesoPct.toFixed(1)}%`;
+    // Renderiza el bloque de gráficos + tabla de detalle para un subconjunto
+    // de posiciones (dfSubset) -- se llama una vez al entrar y de nuevo cada
+    // vez que cambia el filtro de plataforma, sin tocar el resto de la
+    // página (otros paneles quedan como estaban, abiertos o cerrados).
+    function renderGraficoDetalle(dfSubset) {
+      const cont = div.querySelector(`#ii_grafico_detalle_${moneda}`);
+      div.querySelector(`#ii_conteo_${moneda}`).textContent =
+        `${dfSubset.length} de ${info.df.length} posiciones${dfSubset.length !== info.df.length ? " (filtradas)" : " activas"}.`;
+      if (!dfSubset.length) {
+        cont.innerHTML = `<p class="caption">Ninguna posición coincide con el filtro elegido.</p>`;
+        charts[`comp_${moneda}`]?.destroy();
+        charts[`gp_${moneda}`]?.destroy();
+        return;
+      }
+      cont.innerHTML = `
+        <p><strong>Composición por posición (valor actual)</strong></p>
+        <canvas id="ii_chart_comp_${moneda}" height="${Math.max(160, 28 * dfSubset.length)}"></canvas>
+        <p><strong>Ganancia/pérdida por posición</strong></p>
+        <canvas id="ii_chart_gp_${moneda}" height="${Math.max(160, 28 * dfSubset.length)}"></canvas>
+        <details>
+          <summary>Ver las ${dfSubset.length} posiciones en detalle</summary>
+          <p class="caption"><strong>Peso %</strong>: cuánto pesa esta posición sobre el valor total de títulos
+          (concentración). <strong>Contribución %</strong>: cuánto puso ESTA posición de la ganancia/pérdida TOTAL
+          de la cartera -- distinto de G/P %, que es el retorno de la posición sobre SU propio costo. Ambos se
+          calculan sobre TODA la cartera, no solo lo filtrado, así que sus columnas no van a sumar 100% acá si
+          hay un filtro activo.</p>
+          <div class="tabla-scroll" style="max-height:350px;"><table class="tabla">
+            <thead><tr><th>Ticker</th><th>Plataforma</th><th>Tipo</th><th>Cantidad</th><th>Precio Compra Prom.</th>
+              <th>Costo Total</th><th>Precio Actual</th><th>Valor Actual</th><th>Ganancia/Pérdida</th><th>G/P %</th>
+              <th>Peso %</th><th>Contribución %</th></tr></thead>
+            <tbody>${[...dfSubset].sort((a, b) => toNumber(b.ValorActual) - toNumber(a.ValorActual)).map((f) => `<tr>
+              <td>${f.Ticker}</td><td>${f.Plataforma}</td><td>${f.Tipo}</td>
+              <td>${toNumber(f.Cantidad).toLocaleString("en-US", { maximumFractionDigits: 4 })}</td>
+              <td>${fmt(toNumber(f.PrecioCompra))}</td><td>${fmt(toNumber(f.CostoTotal))}</td>
+              <td>${fmt(toNumber(f.PrecioActual))}</td><td>${fmt(toNumber(f.ValorActual))}</td>
+              <td>${fmt(toNumber(f.GananciaPerdida))}</td><td>${f.GPpct.toFixed(1)}%</td>
+              <td>${f.PesoPct.toFixed(1)}%</td><td>${f.ContribucionPct.toFixed(1)}%</td>
+            </tr>`).join("")}</tbody>
+          </table></div>
+        </details>
+      `;
+
+      const compOrdenado = [...dfSubset].sort((a, b) => toNumber(a.ValorActual) - toNumber(b.ValorActual));
+      charts[`comp_${moneda}`]?.destroy();
+      charts[`comp_${moneda}`] = new Chart(cont.querySelector(`#ii_chart_comp_${moneda}`).getContext("2d"), {
+        type: "bar",
+        data: { labels: compOrdenado.map((f) => f.Etiqueta),
+                 datasets: [{ label: "Valor Actual", data: compOrdenado.map((f) => toNumber(f.ValorActual)), backgroundColor: "#1d4ed8" }] },
+        options: {
+          indexAxis: "y", responsive: true,
+          plugins: {
+            legend: { display: false },
+            title: { display: true, text: `Valor de mercado por posición (${unidad})` },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const f = compOrdenado[ctx.dataIndex];
+                  return `${fmt(ctx.parsed.x)} — Peso: ${f.PesoPct.toFixed(1)}%`;
+                },
               },
             },
           },
+          scales: { x: { title: { display: true, text: unidad }, ticks: { callback: (v) => fmt(v) } } },
         },
-        scales: { x: { title: { display: true, text: unidad }, ticks: { callback: (v) => fmt(v) } } },
-      },
-    });
-    const gpOrdenado = [...info.df].sort((a, b) => a.GPpct - b.GPpct);
-    charts[`gp_${moneda}`]?.destroy();
-    charts[`gp_${moneda}`] = new Chart(div.querySelector(`#ii_chart_gp_${moneda}`).getContext("2d"), {
-      type: "bar",
-      data: { labels: gpOrdenado.map((f) => f.Etiqueta),
-               datasets: [{ label: "G/P %", data: gpOrdenado.map((f) => f.GPpct), backgroundColor: gpOrdenado.map((f) => (f.GPpct >= 0 ? "#0ca30c" : "#d03b3b")) }] },
-      options: {
-        indexAxis: "y", responsive: true,
-        plugins: {
-          legend: { display: false },
-          title: { display: true, text: "Retorno sobre costo por posición" },
-          tooltip: {
-            callbacks: {
-              label: (ctx) => {
-                const f = gpOrdenado[ctx.dataIndex];
-                return `${ctx.parsed.x >= 0 ? "+" : ""}${ctx.parsed.x.toFixed(1)}% — ${fmt(toNumber(f.GananciaPerdida))}`;
+      });
+      const gpOrdenado = [...dfSubset].sort((a, b) => a.GPpct - b.GPpct);
+      charts[`gp_${moneda}`]?.destroy();
+      charts[`gp_${moneda}`] = new Chart(cont.querySelector(`#ii_chart_gp_${moneda}`).getContext("2d"), {
+        type: "bar",
+        data: { labels: gpOrdenado.map((f) => f.Etiqueta),
+                 datasets: [{ label: "G/P %", data: gpOrdenado.map((f) => f.GPpct), backgroundColor: gpOrdenado.map((f) => (f.GPpct >= 0 ? "#0ca30c" : "#d03b3b")) }] },
+        options: {
+          indexAxis: "y", responsive: true,
+          plugins: {
+            legend: { display: false },
+            title: { display: true, text: "Retorno sobre costo por posición" },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const f = gpOrdenado[ctx.dataIndex];
+                  return `${ctx.parsed.x >= 0 ? "+" : ""}${ctx.parsed.x.toFixed(1)}% — ${fmt(toNumber(f.GananciaPerdida))}`;
+                },
               },
             },
           },
+          scales: { x: { title: { display: true, text: "Retorno sobre costo (%)" }, ticks: { callback: (v) => `${v}%` } } },
         },
-        scales: { x: { title: { display: true, text: "Retorno sobre costo (%)" }, ticks: { callback: (v) => `${v}%` } } },
-      },
-    });
+      });
+    }
+
+    const casillasPlat = div.querySelectorAll(`.${claseChkPlat}`);
+    function actualizarFiltro() {
+      if (!casillasPlat.length) { renderGraficoDetalle(info.df); return; }
+      const seleccion = new Set([...casillasPlat].filter((el) => el.checked).map((el) => el.value));
+      renderGraficoDetalle(info.df.filter((f) => seleccion.has(f.Plataforma)));
+    }
+    casillasPlat.forEach((el) => el.addEventListener("change", actualizarFiltro));
+    actualizarFiltro();
   }
 
   function renderCapitalAportado(div, datos) {

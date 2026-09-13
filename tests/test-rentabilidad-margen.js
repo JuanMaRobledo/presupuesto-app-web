@@ -271,8 +271,13 @@ async function testPesoYContribucionPorPosicion() {
   await page.click('.nav-btn:has-text("📈 Informe de Inversiones")');
   await page.waitForTimeout(600);
 
+  // Acotado al <details> que tiene el texto "posiciones en detalle" --
+  // desde que existen los paneles colapsables (.panel-colapsable) que
+  // agrupan gráficos/métricas, ".last()" sobre TODOS los <details> de la
+  // página ya no apunta de forma confiable a la tabla de posiciones (puede
+  // haber un panel colapsable de "Efecto cambiario" después).
   await page.click('#ii-contenido details summary:has-text("posiciones en detalle")');
-  const texto = await page.locator("#ii-contenido details").last().innerText();
+  const texto = await page.locator('#ii-contenido details:has-text("posiciones en detalle")').last().innerText();
   // Valor total = 1100 + 200 = 1300. MSFT: Peso = 1100/1300 = 84.6%.
   // Ganancia total = 200 + 100 = 300. MSFT: Contribución = 200/300 = 66.7%.
   check(texto.includes("84.6%"), `Peso % de MSFT = 1100/1300 = 84.6% (vi: "${texto}")`);
@@ -280,6 +285,69 @@ async function testPesoYContribucionPorPosicion() {
   // AAPL: Peso = 200/1300 = 15.4%. Contribución = 100/300 = 33.3%.
   check(texto.includes("15.4%"), "Peso % de AAPL = 200/1300 = 15.4%");
   check(texto.includes("33.3%"), "Contribución % de AAPL = 100/300 = 33.3%");
+
+  await browser.close();
+}
+
+// Filtro de plataforma sobre gráficos y tabla (Informe de Inversiones,
+// panel "📊 Gráficos y detalle por posición"): desmarcar una plataforma
+// tiene que actualizar el conteo y sacar sus posiciones de la tabla de
+// detalle, sin tocar "Mejor/Peor posición" (esas son sobre TODA la
+// cartera, no filtrables -- mismo criterio que Peso %/Contribución %).
+async function testFiltroPlataformaGraficos() {
+  const MOCK_RANGES = {
+    "'Inversiones - Pesos'!A5:H45": [],
+    "'Inversiones - Pesos'!A79:D1000": [],
+    "'Inversiones - Dólares'!A5:H45": [
+      ["IBKR - MSFT", "Acción", 2, 450, 900, 550, 1100, 200],
+      ["IBKR - AAPL", "Acción", 1, 100, 100, 200, 200, 100],
+      ["Binance - BTC", "Cripto", 0.01, 40000, 400, 60000, 600, 200],
+    ],
+    "'Inversiones - Dólares'!A79:D1000": [],
+    "'Datos de Mercado (Auto)'!A1:B10": [["TRM (USD/COP)", 4000]],
+    "'Historial TRM (Auto)'!A2:B5000": [],
+    "'Historial de Inversiones'!A2:J5000": [],
+    "'Historial de Valor de Cartera'!A2:F5000": [],
+  };
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+
+  await setupMocks(page, MOCK_RANGES);
+  await gotoLoggedIn(page);
+  await page.click('.nav-btn:has-text("📈 Informe de Inversiones")');
+  await page.waitForTimeout(600);
+
+  // Mejor = AAPL (+100%, costo 100 -> ganancia 100), Peor = MSFT (+22.2%,
+  // costo 900 -> ganancia 200) -- BTC (+50%, costo 400 -> ganancia 200)
+  // queda en el medio, ninguna de las dos.
+  const panel = page.locator("#ii-contenido .panel-colapsable", { hasText: "Gráficos y detalle por posición" }).last();
+  let texto = await panel.innerText();
+  check(texto.includes("3 posiciones activas"), `Sin filtrar, muestra las 3 posiciones (vi: "${texto.slice(0, 200)}")`);
+  check(texto.includes("AAPL") && texto.includes("+100.0%"), `Mejor posición = AAPL +100% (vi: "${texto.slice(0, 150)}")`);
+  check(texto.includes("MSFT") && texto.includes("+22.2%"), `Peor posición = MSFT +22.2% (vi: "${texto.slice(0, 150)}")`);
+
+  const chkBinance = panel.locator('input[type="checkbox"][value="Binance"]');
+  check(await chkBinance.count() === 1, "Existe la casilla 'Binance' en el filtro");
+  await chkBinance.uncheck();
+  await page.waitForTimeout(200);
+
+  texto = await panel.innerText();
+  check(texto.includes("2 de 3 posiciones (filtradas)"), `Tras desmarcar Binance, muestra 2 de 3 (vi: "${texto.slice(0, 250)}")`);
+
+  // Abrir el detalle para confirmar que BTC ya no aparece en la tabla.
+  await panel.locator('summary:has-text("posiciones en detalle")').click();
+  const tablaTexto = await panel.locator("details:has-text('posiciones en detalle')").last().innerText();
+  check(!tablaTexto.includes("BTC"), `BTC ya no aparece en la tabla de detalle filtrada (vi: "${tablaTexto.slice(0, 300)}")`);
+  check(tablaTexto.includes("MSFT") && tablaTexto.includes("AAPL"), "MSFT y AAPL (IBKR) siguen en la tabla");
+
+  // Mejor/Peor posición no se filtran -- siguen siendo AAPL/MSFT (de TODA
+  // la cartera) aunque Binance esté desmarcada de gráficos/tabla.
+  const textoCompleto = await panel.innerText();
+  check(textoCompleto.includes("AAPL") && textoCompleto.includes("+100.0%"),
+    "Mejor posición sigue mostrando AAPL +100% pese al filtro (no es filtrable)");
+  check(textoCompleto.includes("MSFT") && textoCompleto.includes("+22.2%"),
+    "Peor posición sigue mostrando MSFT +22.2% pese al filtro (no es filtrable)");
 
   await browser.close();
 }
@@ -460,6 +528,7 @@ async function testXirrVentanaCorta() {
   await testRentabilidadUnificadaSeleccion();
   await testFormatoUsdDosDecimales();
   await testXirrVentanaCorta();
+  await testFiltroPlataformaGraficos();
   console.log(failures === 0 ? "\nTODOS LOS TESTS PASARON" : `\n${failures} TEST(S) FALLARON`);
   process.exit(failures === 0 ? 0 : 1);
 })().catch((err) => {

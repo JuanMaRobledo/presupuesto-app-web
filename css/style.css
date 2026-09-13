@@ -200,6 +200,53 @@ h6 { margin: 16px 0 4px; font-size: 0.85rem; color: var(--text-muted); text-tran
 
 details { margin: 12px 0; }
 details summary { cursor: pointer; color: var(--accent); font-weight: 500; }
+
+/* Secciones colapsables tipo "panel" -- para agrupar bloques densos
+   (gráficos, tablas de detalle) en tarjetas separadas en vez de un solo
+   scroll continuo. No toca <details> sueltos (siguen con el estilo simple
+   de arriba, color de acento). */
+.panel-colapsable {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin: 16px 0;
+  background: var(--bg-alt);
+  overflow: hidden;
+}
+.panel-colapsable > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 12px 16px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+}
+.panel-colapsable > summary::-webkit-details-marker { display: none; }
+.panel-colapsable > summary::after {
+  content: "▸";
+  color: var(--text-muted);
+  font-weight: 400;
+  transition: transform 0.15s ease;
+  margin-left: 12px;
+  flex-shrink: 0;
+}
+.panel-colapsable[open] > summary::after { transform: rotate(90deg); }
+.panel-colapsable > summary:hover { background: var(--border); }
+.panel-colapsable-body { padding: 4px 16px 16px; }
+.panel-colapsable-body > *:first-child { margin-top: 8px; }
+
+/* Filtro de plataforma/tipo sobre gráficos -- mismo patrón visual que
+   .checks-row, con una tarjeta liviana para separarlo del contenido que
+   filtra. */
+.filtro-chart {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin: 8px 0 16px;
+}
+.filtro-chart .filtro-chart-titulo { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 4px; }
 .tabla { border-collapse: collapse; width: 100%; margin-top: 8px; font-size: 0.9rem; }
 .tabla th, .tabla td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); }
 .tabla th { color: var(--text-muted); font-weight: 500; }
