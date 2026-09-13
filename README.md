@@ -22,6 +22,13 @@ GitHub Pages abre esa portada.
 
 ✅ Portado:
 - Login con Google (OAuth del lado del navegador, sin backend)
+- 💾 Copia de seguridad — botón siempre visible en la barra lateral (no hace
+  falta entrar a ninguna página puntual): descarga TODAS las hojas del
+  Sheet, tal como están hoy, en un solo archivo `.xlsx` armado del lado del
+  navegador con [SheetJS](https://sheetjs.com/) — sin backend ni scope
+  nuevo (el mismo scope `spreadsheets` que ya usa el resto de la app
+  alcanza para listar y leer todas las hojas, no solo los rangos con
+  nombre que usa cada página).
 - 🏠 Resumen — **completo**: Ingresos, Gastos, Balance (con tasa de ahorro
   discriminada por origen — efectivo/ahorro/inversión, incluyendo el cruce
   de cada movimiento "Inversiones" contra la plataforma real y el neteo de
@@ -82,17 +89,25 @@ GitHub Pages abre esa portada.
   sus propias métricas de Costo/Valor/Ganancia), Patrimonio unificado
   (desglose Acciones vs. Fondos de Inversión en COP, más el bloque aparte
   de liquidez), y Liquidez no cuenta para XIRR/Rentabilidad/Comparación
-  contra benchmark. "🎛️ Rentabilidad personalizada" reemplaza la vieja
-  métrica fija: casillas para elegir a mano qué plataformas juntar (cada
-  aporte/retiro se cuenta completo por la plataforma a la que fue
-  destinado — un aporte no se puede partir entre el tipo de activo que
-  compró esa plataforma con esa plata) y recalcula "Rentabilidad sobre
-  aportes netos"/XIRR al vuelo, sin volver a pedirle nada al Sheet; por
-  defecto viene marcado todo menos "Fiducuenta (reserva impuestos)" (mismo
-  resultado que antes). Como siempre, se oculta el % (con un aviso
-  explicando por qué) si los retiros de la selección superan los
-  depósitos, para no dividir por un neto negativo y mostrar un porcentaje
-  sin sentido (el caso real que motivó esto daba "-768%"). Fiducuenta
+  contra benchmark. Tanto la tabla de "Depósitos y retiros" de arriba de
+  todo como "🎛️ Rentabilidad personalizada" tienen una casilla por cuenta
+  (Acciones y Valores, Trii, Fiducuenta, Plenti, Binance, Hapi, Interactive
+  Brokers, y el efectivo/margen de cada broker aparte de sus acciones —
+  p. ej. "Interactive Brokers - Efectivo/Margen" es una cuenta propia,
+  distinta de "Interactive Brokers"): marcar/desmarcar recalcula la tabla y
+  el resumen Depósitos/Retiros/Flujo neto, o la rentabilidad/XIRR, al
+  vuelo, sin volver a pedirle nada al Sheet. El valor de cada cuenta se
+  calcula del lado del cliente a partir del TickerFondo de cada posición
+  (Posiciones no tiene columna Plataforma propia), y un aporte/retiro se
+  cuenta completo por la plataforma a la que fue destinado — no se puede
+  partir entre el tipo de activo que compró esa plataforma con esa plata.
+  Por defecto, Rentabilidad personalizada viene marcada con todo lo que
+  tiene retorno de mercado (ni Fiducuenta ni el efectivo/margen del
+  broker), mismo resultado que la vieja métrica fija que reemplaza. Como
+  siempre, se oculta el % (con un aviso explicando por qué) si los retiros
+  de la selección superan los depósitos, para no dividir por un neto
+  negativo y mostrar un porcentaje sin sentido (el caso real que motivó
+  esto daba "-768%"). Fiducuenta
   (Fiducuenta *5601, un fondo de inversión colectiva de Bancolombia usado
   como reserva de impuestos, no una posición de bolsa) tiene además su
   propia "Rentabilidad de Fiducuenta (reserva impuestos)" fija (más su

@@ -281,13 +281,11 @@ const PaginaInversiones = (() => {
         <div class="col-2">
           <div>
             <h4>Pesos (COP)</h4>
-            <p class="caption">Trii / Acciones y Valores — acciones y fondos</p>
-            ${renderAportes(datos.aportesPesos, "pesos")}
+            <div id="aportes-pesos"></div>
           </div>
           <div>
             <h4>Dólares (USD)</h4>
-            <p class="caption">Plenti, Binance, Hapi, Interactive Brokers</p>
-            ${renderAportes(datos.aportesDolares, "dolares")}
+            <div id="aportes-dolares"></div>
           </div>
         </div>
 
@@ -317,6 +315,8 @@ const PaginaInversiones = (() => {
       `;
 
       renderGraficos(contenido, datos);
+      renderAportesConFiltro(contenido.querySelector("#aportes-pesos"), datos.aportesPesos, "pesos");
+      renderAportesConFiltro(contenido.querySelector("#aportes-dolares"), datos.aportesDolares, "dolares");
       renderPatrimonioUnificado(contenido.querySelector("#inv-patrimonio"), datos);
       renderCrecimientoRentabilidad(contenido.querySelector("#inv-crecimiento-pesos"), datos, "pesos");
       renderCrecimientoRentabilidad(contenido.querySelector("#inv-crecimiento-dolares"), datos, "dolares");
@@ -523,26 +523,43 @@ const PaginaInversiones = (() => {
   // tenía la métrica fija anterior), para no cambiar el resultado por
   // defecto -- desmarcar/marcar plataformas recalcula todo al vuelo, sin
   // volver a pedirle nada al Sheet.
+  // Clave de cuenta seleccionable para una posición: la Plataforma
+  // (plataformaDePosicion) para posiciones de inversión de verdad, pero un
+  // sufijo aparte para el efectivo/margen del broker -- así "Interactive
+  // Brokers" (las acciones) y "Interactive Brokers - Efectivo/Margen" (el
+  // saldo de caja/deuda de margen) se pueden marcar por separado, ya que
+  // uno tiene retorno de mercado y el otro no. Fiducuenta no necesita este
+  // tratamiento especial: su TickerFondo ya es igual a su Plataforma.
+  function claveCuenta(f) {
+    const p = plataformaDePosicion(f);
+    return esCuentaLiquidez(f) && /Efectivo\/Margen$/i.test(String(f.TickerFondo || "")) ? `${p} - Efectivo/Margen` : p;
+  }
+
   function renderRentabilidadPersonalizada(div, aportesMoneda, posicionesMoneda, moneda, trm) {
-    const posicionesInversion = posicionesMoneda.filter((f) => !esCuentaLiquidez(f));
-    const plataformas = [...new Set([
+    const cuentas = [...new Set([
       ...aportesMoneda.map((f) => f.Plataforma),
-      ...posicionesInversion.map(plataformaDePosicion),
+      ...posicionesMoneda.map(claveCuenta),
     ])].filter(Boolean).sort();
 
-    if (!plataformas.length) { div.innerHTML = ""; return; }
+    if (!cuentas.length) { div.innerHTML = ""; return; }
+
+    // Por defecto viene marcado todo lo que tenga retorno de mercado --
+    // ni Fiducuenta ni el efectivo/margen del broker, mismo resultado que
+    // se mostraba antes de que esto fuera seleccionable a mano.
+    const marcadaPorDefecto = (c) => c !== PLATAFORMA_FONDO_BANCO && !c.endsWith(" - Efectivo/Margen");
 
     const claseChk = `chk_plat_${moneda}`;
     div.innerHTML = `
       <h6>🎛️ Rentabilidad personalizada</h6>
-      <p class="caption">Elegí qué plataformas juntar para la rentabilidad sobre aportes netos y el XIRR --
-      por defecto viene marcado todo menos Fiducuenta (lo mismo que se mostraba antes). Cada aporte/retiro se
-      cuenta completo por la plataforma a la que fue destinado -- no se puede partir un aporte entre el tipo de
-      activo que compró esa plataforma con esa plata.</p>
-      <div class="checks-row">${plataformas.map((p) => `
+      <p class="caption">Elegí qué cuentas juntar para la rentabilidad sobre aportes netos y el XIRR -- por
+      defecto viene marcado todo lo que tiene retorno de mercado (ni Fiducuenta ni el efectivo/margen del
+      broker, lo mismo que se mostraba antes). Cada aporte/retiro se cuenta completo por la plataforma a la
+      que fue destinado -- no se puede partir un aporte entre el tipo de activo que compró esa plataforma con
+      esa plata.</p>
+      <div class="checks-row">${cuentas.map((c) => `
         <label style="margin-right:14px; white-space:nowrap;">
-          <input type="checkbox" class="${claseChk}" value="${p}" ${p === PLATAFORMA_FONDO_BANCO ? "" : "checked"}>
-          ${p}
+          <input type="checkbox" class="${claseChk}" value="${c}" ${marcadaPorDefecto(c) ? "checked" : ""}>
+          ${c}
         </label>
       `).join("")}</div>
       <div id="rentper_metrics_${moneda}" class="metric-row"></div>
@@ -555,8 +572,8 @@ const PaginaInversiones = (() => {
     function recalcular() {
       const seleccion = new Set([...div.querySelectorAll(`.${claseChk}:checked`)].map((el) => el.value));
       const aportesSel = aportesMoneda.filter((f) => seleccion.has(f.Plataforma));
-      const valorSel = posicionesInversion
-        .filter((f) => seleccion.has(plataformaDePosicion(f)))
+      const valorSel = posicionesMoneda
+        .filter((f) => seleccion.has(claveCuenta(f)))
         .reduce((s, f) => s + toNumber(f.ValorActual), 0);
 
       const metricsHtml = [];
@@ -637,21 +654,46 @@ const PaginaInversiones = (() => {
     }
   }
 
-  function renderAportes(aportes, sufijo) {
-    if (!aportes.length) return `<p>Todavía no hay aportes registrados.</p>`;
-    const { dep, ret, neto } = resumenAportes(aportes);
-    const filas = [...aportes].sort((a, b) => {
-      const fa = parseFechaISO(a.Fecha) || "";
-      const fb = parseFechaISO(b.Fecha) || "";
-      return fb.localeCompare(fa);
-    });
-    return `
-      <div class="metric-row">
+  // Puerto extendido de renderAportes() -- antes mostraba TODOS los aportes
+  // de la moneda en una sola tabla con una leyenda fija ("Trii / Acciones y
+  // Valores", "Plenti, Binance, Hapi, Interactive Brokers") que no
+  // mencionaba Fiducuenta, aunque sus filas SÍ aparecían mezcladas ahí
+  // (reportado por el usuario). Ahora cada cuenta/plataforma es una casilla
+  // -- se puede ver una sola cuenta a la vez, o cualquier combinación, y el
+  // resumen (Depósitos/Retiros/Flujo neto) y la tabla se filtran juntos.
+  function renderAportesConFiltro(div, aportes, moneda) {
+    if (!aportes.length) { div.innerHTML = `<p>Todavía no hay aportes registrados.</p>`; return; }
+    const plataformas = [...new Set(aportes.map((f) => f.Plataforma).filter(Boolean))].sort();
+    const claseChk = `chk_aportes_${moneda}`;
+
+    div.innerHTML = `
+      <div class="checks-row">${plataformas.map((p) => `
+        <label style="margin-right:14px; white-space:nowrap;">
+          <input type="checkbox" class="${claseChk}" value="${p}" checked> ${p}
+        </label>
+      `).join("")}</div>
+      <div id="aportes_metrics_${moneda}" class="metric-row"></div>
+      <div id="aportes_tabla_${moneda}" class="tabla-scroll" style="max-height:300px;"></div>
+    `;
+
+    const metricsDiv = div.querySelector(`#aportes_metrics_${moneda}`);
+    const tablaDiv = div.querySelector(`#aportes_tabla_${moneda}`);
+
+    function recalcular() {
+      const seleccion = new Set([...div.querySelectorAll(`.${claseChk}:checked`)].map((el) => el.value));
+      const filtrados = aportes.filter((f) => seleccion.has(f.Plataforma));
+      const { dep, ret, neto } = resumenAportes(filtrados);
+      metricsDiv.innerHTML = `
         ${metric("Depósitos", fmtMoneda(dep))}
         ${metric("Retiros", fmtMoneda(ret))}
         ${metric("Flujo neto", fmtMoneda(neto))}
-      </div>
-      <div class="tabla-scroll" style="max-height:300px;">
+      `;
+      const filas = [...filtrados].sort((a, b) => {
+        const fa = parseFechaISO(a.Fecha) || "";
+        const fb = parseFechaISO(b.Fecha) || "";
+        return fb.localeCompare(fa);
+      });
+      tablaDiv.innerHTML = `
         <table class="tabla">
           <thead><tr><th>Fecha</th><th>Plataforma</th><th>Flujo</th><th>Monto</th><th>Notas</th></tr></thead>
           <tbody>${filas.map((f) => {
@@ -660,8 +702,11 @@ const PaginaInversiones = (() => {
               <td>${m >= 0 ? "Depósito" : "Retiro"}</td><td>${fmtMoneda(m)}</td><td>${f.Notas ?? ""}</td></tr>`;
           }).join("")}</tbody>
         </table>
-      </div>
-    `;
+      `;
+    }
+
+    div.querySelectorAll(`.${claseChk}`).forEach((el) => el.addEventListener("change", recalcular));
+    recalcular();
   }
 
   function renderPosiciones(posiciones, moneda, aportes = null) {

@@ -77,6 +77,16 @@ button {
 .nav-btn:not(:disabled):hover { background: var(--border); }
 .nav-btn:disabled { color: var(--text-muted); cursor: not-allowed; }
 .nav-btn.activo { background: var(--accent); color: white; }
+#backup-widget { margin-top: 12px; }
+#backup-widget button {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text);
+}
+#backup-widget .caption { font-size: 0.75rem; }
 #btn-logout {
   margin-top: 12px;
   padding: 8px;

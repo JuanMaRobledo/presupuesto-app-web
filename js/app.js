@@ -43,6 +43,7 @@ function mostrarApp() {
   document.getElementById("pantalla-login").style.display = "none";
   document.getElementById("app").style.display = "flex";
   construirNav();
+  Backup.render(document.getElementById("backup-widget"));
   seleccionarPagina("🏠 Resumen");
 }
 

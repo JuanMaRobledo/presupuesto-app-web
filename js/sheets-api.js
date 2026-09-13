@@ -110,5 +110,41 @@ const SheetsApi = (() => {
     return res.json();
   }
 
-  return { batchGet, updateRange, batchUpdateRanges, appendRows, clearRange, batchClearRanges };
+  // Lista los títulos de TODAS las hojas del spreadsheet (no solo las que
+  // ya tienen un rango con nombre en RANGOS) -- usado por la copia de
+  // seguridad para exportar el Sheet completo, tal como está hoy.
+  async function listarHojas() {
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}?fields=sheets.properties.title`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token()}` } });
+    if (!res.ok) {
+      const texto = await res.text();
+      throw new Error(`Error ${res.status} leyendo la lista de hojas: ${texto}`);
+    }
+    const data = await res.json();
+    return (data.sheets || []).map((s) => s.properties.title);
+  }
+
+  // Trae el contenido COMPLETO (todas las filas/columnas usadas, tal como
+  // se ven en pantalla) de cada hoja en 'titulos', en un solo batchGet.
+  async function batchGetHojasCompletas(titulos) {
+    if (!titulos.length) return {};
+    const params = new URLSearchParams();
+    titulos.forEach((t) => params.append("ranges", `'${t.replace(/'/g, "''")}'`));
+    params.append("valueRenderOption", "FORMATTED_VALUE");
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${CONFIG.SHEET_ID}/values:batchGet?${params}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token()}` } });
+    if (!res.ok) {
+      const texto = await res.text();
+      throw new Error(`Error ${res.status} leyendo el Sheet completo: ${texto}`);
+    }
+    const data = await res.json();
+    const porTitulo = {};
+    (data.valueRanges || []).forEach((vr, i) => { porTitulo[titulos[i]] = vr.values || []; });
+    return porTitulo;
+  }
+
+  return {
+    batchGet, updateRange, batchUpdateRanges, appendRows, clearRange, batchClearRanges,
+    listarHojas, batchGetHojasCompletas,
+  };
 })();
