@@ -1,0 +1,42 @@
+name: Tests
+
+# Corre la suite de Playwright (tests/) contra la app servida estáticamente
+# desde este mismo repo -- sin backend ni cuenta de servicio: cada test
+# mockea las respuestas de la API de Sheets (ver tests/*.js), así que no
+# toca el Sheet real ni necesita ningún secret.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: {}
+
+jobs:
+  playwright:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Instalar Chromium (Playwright)
+        run: npx playwright install --with-deps chromium
+
+      - name: Servir la app estática
+        run: python3 -m http.server 8123 &
+
+      - name: Esperar a que el servidor responda
+        run: |
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:8123/app.html > /dev/null && exit 0
+            sleep 0.5
+          done
+          echo "El servidor estático no respondió a tiempo" >&2
+          exit 1
+
+      - name: Correr los tests
+        run: npm test

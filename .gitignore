@@ -2,6 +2,9 @@
 *.xlsx
 *.xls
 !plantilla*.xlsx
+# Fixtures sintéticos (datos inventados) para los tests de Playwright --
+# ver tests/*.js.
+!tests/*.xlsx
 *.backup-*
 
 # Python
@@ -12,6 +15,9 @@ venv/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Node (harness de pruebas -- Playwright, xlsx, pdfjs-dist; ver package.json)
+node_modules/
 
 # Sistema
 .DS_Store
