@@ -147,8 +147,11 @@ async function testXirrCapitalPropioRentabilidadPersonalizada() {
   await page.click('.nav-btn:has-text("📈 Inversiones")');
   await page.waitForTimeout(600);
 
-  const chkMargen = page.locator('input[type="checkbox"][value="Interactive Brokers - Efectivo/Margen"]');
-  check(await chkMargen.count() === 1, `Existe la casilla "Interactive Brokers - Efectivo/Margen" (vi ${await chkMargen.count()})`);
+  // Acotado a #rentper_dolares -- desde que existe la sección "Rentabilidad
+  // unificada personalizada" (#patrimonio_rentper_unificada), la misma
+  // cuenta también aparece ahí como una segunda casilla independiente.
+  const chkMargen = page.locator('#rentper_dolares input[type="checkbox"][value="Interactive Brokers - Efectivo/Margen"]');
+  check(await chkMargen.count() === 1, `Existe la casilla "Interactive Brokers - Efectivo/Margen" en Rentabilidad personalizada (vi ${await chkMargen.count()})`);
   check(!(await chkMargen.isChecked()), "La casilla de Efectivo/Margen viene DESmarcada por defecto");
 
   const texto = await page.locator("#inv-contenido").innerText();
@@ -281,6 +284,74 @@ async function testPesoYContribucionPorPosicion() {
   await browser.close();
 }
 
+// "Rentabilidad unificada personalizada" (página 📈 Inversiones, sección
+// Patrimonio unificado): dos filas de casillas, una por moneda, que se
+// combinan en un solo XIRR -- verifica que desmarcar la cuenta en pesos
+// recalcula al vuelo y da el mismo número que la selección "solo dólares"
+// (mismo escenario y mismos montos que testXirrCapitalPropioRentabilidadPersonalizada).
+async function testRentabilidadUnificadaSeleccion() {
+  const MOCK_RANGES = {
+    "'Inversiones - Pesos'!A5:H45": [
+      ["Acciones y Valores - ECOPETROL", "Acción", 1, 800000, 800000, 1000000, 1000000, 200000],
+    ],
+    "'Inversiones - Pesos'!A79:D1000": [
+      ["2026-01-01", "Acciones y Valores", 800000, ""],
+    ],
+    ...MOCK_DOLARES_CON_MARGEN,
+  };
+  const browser = await chromium.launch();
+  const page = await browser.newPage();
+  page.on("pageerror", (err) => console.log("PAGE ERROR:", err.message));
+  page.on("console", (msg) => { if (msg.type() === "error") console.log("CONSOLE ERROR:", msg.text()); });
+
+  await setupMocks(page, MOCK_RANGES);
+  await gotoLoggedIn(page);
+  await page.click('.nav-btn:has-text("📈 Inversiones")');
+  await page.waitForTimeout(600);
+
+  const seccion = page.locator("#patrimonio_rentper_unificada");
+  check(await seccion.locator("text=Rentabilidad unificada personalizada").count() > 0,
+    "Aparece la sección 'Rentabilidad unificada personalizada'");
+
+  const chkPesos = seccion.locator('input[type="checkbox"][value="Acciones y Valores"]');
+  const chkDolares = seccion.locator('input[type="checkbox"][value="Interactive Brokers"]');
+  check(await chkPesos.count() === 1, `Casilla "Acciones y Valores" (pesos) presente (vi ${await chkPesos.count()})`);
+  check(await chkDolares.count() === 1, `Casilla "Interactive Brokers" (dólares) presente (vi ${await chkDolares.count()})`);
+  check(await chkPesos.isChecked(), "Pesos viene marcado por defecto");
+  check(await chkDolares.isChecked(), "Dólares viene marcado por defecto");
+
+  const metricSel = seccion.locator("text=XIRR unificado (selección, sobre capital propio)").locator("..");
+  const textoInicial = await metricSel.innerText();
+  const filaInicial = textoInicial.match(/([+-]?[\d.]+)%/);
+  check(!!filaInicial, `El XIRR de selección (todo marcado) tiene un valor calculado (vi: "${textoInicial}")`);
+  if (filaInicial) {
+    check(parseFloat(filaInicial[1]) < 0,
+      `Con todo marcado da negativo, igual que el fijo (4.200.000 propio combinado < 4.800.000 aportado) (vi: ${filaInicial[1]}%)`);
+  }
+
+  // Desmarcar pesos -> selección queda solo con dólares -> debe coincidir
+  // con el escenario "solo dólares, sobre capital propio" ya probado en
+  // testXirrCapitalPropioRentabilidadPersonalizada (mismos montos: aporte
+  // 4.000.000 COP, capital propio 800 USD * TRM 4.000 = 3.200.000).
+  await chkPesos.uncheck();
+  await page.waitForTimeout(150);
+  const textoSoloDolares = await metricSel.innerText();
+  const filaSoloDolares = textoSoloDolares.match(/([+-]?[\d.]+)%/);
+  check(!!filaSoloDolares, `Tras desmarcar pesos, sigue habiendo un valor calculado (vi: "${textoSoloDolares}")`);
+  if (filaSoloDolares) {
+    check(parseFloat(filaSoloDolares[1]) < 0,
+      `Solo dólares también da negativo (800 USD propio * TRM 4.000 = 3.200.000 < 4.000.000 aportado) (vi: ${filaSoloDolares[1]}%)`);
+  }
+
+  // Desmarcar también dólares -> ninguna cuenta elegida -> aviso, no "—".
+  await chkDolares.uncheck();
+  await page.waitForTimeout(150);
+  const textoVacio = await seccion.innerText();
+  check(textoVacio.includes("Elegí al menos una cuenta"), `Sin ninguna cuenta marcada, muestra el aviso (vi: "${textoVacio.slice(-200)}")`);
+
+  await browser.close();
+}
+
 (async () => {
   await testXirrCapitalPropioInforme();
   await testXirrUnificado();
@@ -288,6 +359,7 @@ async function testPesoYContribucionPorPosicion() {
   await testXirrCapitalPropioUsdInforme();
   await testTwrCapitalPropio();
   await testPesoYContribucionPorPosicion();
+  await testRentabilidadUnificadaSeleccion();
   console.log(failures === 0 ? "\nTODOS LOS TESTS PASARON" : `\n${failures} TEST(S) FALLARON`);
   process.exit(failures === 0 ? 0 : 1);
 })().catch((err) => {

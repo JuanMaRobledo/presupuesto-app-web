@@ -108,7 +108,14 @@ de Google a los logins dentro de ventanas empotradas.
   de liquidez, que ahora también trae su propio "📐 Rentabilidad unificada"
   — un solo XIRR combinando pesos y dólares SOBRE CAPITAL PROPIO, es decir
   restando el margen/efectivo prestado de ambas monedas del valor final, no
-  como una pérdida sino como plata que no es tuya), y Liquidez no cuenta
+  como una pérdida sino como plata que no es tuya), más "🎛️ Rentabilidad
+  unificada personalizada" justo debajo — dos filas de casillas (una por
+  moneda, mismo criterio de "marcado por defecto" que la Rentabilidad
+  personalizada por moneda) que se combinan en un único XIRR de selección
+  sobre capital propio, para poder calcular la rentabilidad de cualquier
+  combinación de cuentas de TODA la cartera (no solo de una moneda a la
+  vez); la cuenta de Efectivo/Margen de cada plataforma elegida se suma
+  sola, igual que en la personalizada por moneda. Liquidez no cuenta
   para el Retorno bruto/simple ni para la Comparación contra benchmark de
   cada moneda por separado, pero sí para el XIRR sobre capital propio (por
   moneda y unificado). Tanto la tabla de "Depósitos y retiros" de arriba de

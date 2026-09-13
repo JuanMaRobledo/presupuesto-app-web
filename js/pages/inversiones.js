@@ -524,6 +524,7 @@ const PaginaInversiones = (() => {
             return xirrUnificado !== null ? `${(xirrUnificado * 100).toFixed(1)}%` : "—";
           })())}
       </div>
+      <div id="patrimonio_rentper_unificada"></div>
       ${hayLiquidez ? `
         <h5>💰 Efectivo, margen y cuentas de liquidez</h5>
         <p class="caption">Aparte de las inversiones de arriba — efectivo/deuda de margen en el broker y
@@ -547,6 +548,7 @@ const PaginaInversiones = (() => {
         options: { responsive: true, plugins: { title: { display: true, text: "Distribución de inversiones por moneda (en COP)" } } },
       });
     }
+    renderRentabilidadPersonalizadaUnificada(div.querySelector("#patrimonio_rentper_unificada"), datos, trm);
   }
 
   function renderCrecimientoRentabilidad(div, datos, moneda) {
@@ -792,6 +794,77 @@ const PaginaInversiones = (() => {
         cuándo tomaste margen), es lo más parecido a lo que tu bróker te muestra como "tu rentabilidad %".</p>
       `;
     }
+  }
+
+  // Puerto de _render_rentabilidad_personalizada_unificada() (app_presupuesto.py):
+  // como renderRentabilidadPersonalizada(), pero para TODA la cartera a la
+  // vez -- dos filas de casillas (una por moneda) que se combinan en un
+  // solo XIRR unificado sobre capital propio, vía rentabilidadXirrUnificada()
+  // ya existente (genérica: no le importa si los aportes/valores que recibe
+  // ya vienen filtrados por selección o no).
+  function renderRentabilidadPersonalizadaUnificada(div, datos, trm) {
+    const cuentasDe = (aportesMoneda, posicionesMoneda) => [...new Set([
+      ...aportesMoneda.map((f) => f.Plataforma),
+      ...posicionesMoneda.map(claveCuenta),
+    ])].filter(Boolean).sort();
+    const cuentasPesos = cuentasDe(datos.aportesPesos, datos.posicionesPesos);
+    const cuentasDolares = cuentasDe(datos.aportesDolares, datos.posicionesDolares);
+    if (!cuentasPesos.length && !cuentasDolares.length) { div.innerHTML = ""; return; }
+
+    const marcadaPorDefecto = (c) => c !== PLATAFORMA_FONDO_BANCO && !c.endsWith(" - Efectivo/Margen");
+    const claseChkPesos = "chk_plat_unificada_pesos";
+    const claseChkDolares = "chk_plat_unificada_dolares";
+    const casillas = (cuentas, clase) => cuentas.map((c) => `
+      <label style="margin-right:14px; white-space:nowrap;">
+        <input type="checkbox" class="${clase}" value="${c}" ${marcadaPorDefecto(c) ? "checked" : ""}>
+        ${c}
+      </label>
+    `).join("");
+
+    div.innerHTML = `
+      <h5>🎛️ Rentabilidad unificada personalizada</h5>
+      <p class="caption">Elegí qué cuentas juntar de cada moneda para un solo XIRR combinado (sobre capital
+      propio) -- la de Efectivo/Margen de cada plataforma elegida se suma sola, igual que en la rentabilidad
+      personalizada por moneda de arriba.</p>
+      ${cuentasPesos.length ? `<p class="caption"><strong>Cuentas en pesos</strong></p>
+        <div class="checks-row">${casillas(cuentasPesos, claseChkPesos)}</div>` : ""}
+      ${cuentasDolares.length ? `<p class="caption"><strong>Cuentas en dólares</strong></p>
+        <div class="checks-row">${casillas(cuentasDolares, claseChkDolares)}</div>` : ""}
+      <div id="rentper_unificada_metrics" class="metric-row"></div>
+    `;
+    const metricsDiv = div.querySelector("#rentper_unificada_metrics");
+
+    // Valor de capital propio de una selección: suma el valor de las
+    // posiciones marcadas, más -- aunque no esté marcada a mano -- la
+    // cuenta de Efectivo/Margen de cada plataforma elegida que tenga una
+    // (mismo patrón que renderRentabilidadPersonalizada()).
+    function valorCapitalPropioSeleccion(posicionesMoneda, cuentasTodas, seleccion) {
+      const margenRelacionado = cuentasTodas.filter((c) =>
+        c.endsWith(" - Efectivo/Margen") && seleccion.has(c.slice(0, -" - Efectivo/Margen".length)));
+      const seleccionPropia = new Set([...seleccion, ...margenRelacionado]);
+      return posicionesMoneda
+        .filter((f) => seleccionPropia.has(claveCuenta(f)))
+        .reduce((s, f) => s + toNumber(f.ValorActual), 0);
+    }
+
+    function recalcular() {
+      const seleccionPesos = new Set([...div.querySelectorAll(`.${claseChkPesos}:checked`)].map((el) => el.value));
+      const seleccionDolares = new Set([...div.querySelectorAll(`.${claseChkDolares}:checked`)].map((el) => el.value));
+      if (!seleccionPesos.size && !seleccionDolares.size) {
+        metricsDiv.innerHTML = `<p class="caption">Elegí al menos una cuenta, en pesos o en dólares, para calcular.</p>`;
+        return;
+      }
+      const aportesPesosSel = datos.aportesPesos.filter((f) => seleccionPesos.has(f.Plataforma));
+      const aportesDolaresSel = datos.aportesDolares.filter((f) => seleccionDolares.has(f.Plataforma));
+      const capitalPropioPesosSel = valorCapitalPropioSeleccion(datos.posicionesPesos, cuentasPesos, seleccionPesos);
+      const capitalPropioDolaresSel = valorCapitalPropioSeleccion(datos.posicionesDolares, cuentasDolares, seleccionDolares);
+      const xirrSel = rentabilidadXirrUnificada(aportesPesosSel, aportesDolaresSel, capitalPropioPesosSel, capitalPropioDolaresSel, trm);
+      metricsDiv.innerHTML = metric("XIRR unificado (selección, sobre capital propio)",
+        xirrSel !== null ? `${(xirrSel * 100).toFixed(1)}%` : "—");
+    }
+
+    div.querySelectorAll(`.${claseChkPesos}, .${claseChkDolares}`).forEach((el) => el.addEventListener("change", recalcular));
+    recalcular();
   }
 
   function renderChartCrecimiento(canvas, serieValor, serieAportes, moneda, unidad) {
