@@ -8,10 +8,14 @@ const PAGINAS = {
   "🏦 Deudas": { modulo: () => PaginaDeudas, disponible: true },
   "📈 Inversiones": { modulo: () => PaginaInversiones, disponible: true },
   "🏢 Estados Financieros": { modulo: () => PaginaEstadosFinancieros, disponible: true },
+  "✅ Verificar Datos": { modulo: () => PaginaVerificarDatos, disponible: true },
+  "🔍 Salud de los Datos": { modulo: () => PaginaSaludDatos, disponible: true },
   "💰 Ingresos": { modulo: () => PaginaIngresos, disponible: true },
   "💳 Egresos": { modulo: () => PaginaEgresos, disponible: true },
   "🧾 Facturación Electrónica": { modulo: () => PaginaFacturacion, disponible: true },
   "📑 Declaraciones de Renta": { modulo: () => PaginaDeclaraciones, disponible: true },
+  "📈 Informe de Inversiones": { modulo: () => PaginaInformeInversiones, disponible: true },
+  "📊 Informe de Presupuesto, Ingresos y Gastos": { modulo: () => PaginaInformePresupuesto, disponible: true },
   "📤 Cargar Extractos": { modulo: () => PaginaCargar, disponible: true },
 };
 
