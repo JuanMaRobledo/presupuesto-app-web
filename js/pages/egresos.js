@@ -207,8 +207,8 @@ const PaginaEgresos = (() => {
   function mostrarMsg(el, texto, esError) {
     el.hidden = false;
     el.textContent = texto;
-    el.style.background = esError ? "#f8d7da" : "#d1e7dd";
-    el.style.color = esError ? "#842029" : "#0f5132";
+    el.style.background = esError ? "var(--error-bg)" : "var(--success-bg)";
+    el.style.color = esError ? "var(--error-text)" : "var(--success-text)";
   }
 
   // ---------------------------------------------------------------------
@@ -756,7 +756,11 @@ const PaginaEgresos = (() => {
     }
   }
 
-  const PALETA = ["#d64545", "#4573d6", "#45a06a", "#d69a45", "#8a56c9", "#45b8c9", "#c9457e", "#a3a3a3"];
+  // Misma paleta categórica que px.defaults.color_discrete_sequence
+  // (app_presupuesto.py) -- arranca con el mismo azul de .metric-value,
+  // para que los gráficos de categorías se sientan parte de la misma app
+  // en las dos versiones.
+  const PALETA = ["#1d4ed8", "#d97706", "#0d9488", "#dc2626", "#7c3aed", "#65a30d", "#0891b2", "#be185d", "#4b5563"];
 
   function renderGraficos(div, blockKey, filas, efectivoMode) {
     const cop = filas.filter((f) => f.Moneda === "COP");
@@ -799,7 +803,7 @@ const PaginaEgresos = (() => {
     const ctxP = div.querySelector(`#canvas_periodo_${blockKey}`).getContext("2d");
     const chartPeriodo = new Chart(ctxP, {
       type: "bar",
-      data: { labels: periodos, datasets: [{ label: "Valor Cargado", data: periodos.map((p) => sumaPorPeriodo[p]), backgroundColor: "#d64545" }] },
+      data: { labels: periodos, datasets: [{ label: "Valor Cargado", data: periodos.map((p) => sumaPorPeriodo[p]), backgroundColor: "#dc2626" }] },
       options: { responsive: true, plugins: { legend: { display: false } },
         scales: { y: { ticks: { callback: (v) => fmtMoneda(v) } } } },
     });

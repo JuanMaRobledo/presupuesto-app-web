@@ -174,8 +174,8 @@ const PaginaFacturacion = (() => {
   function mostrarMsg(el, texto, esError) {
     el.hidden = false;
     el.textContent = texto;
-    el.style.background = esError ? "#f8d7da" : "#d1e7dd";
-    el.style.color = esError ? "#842029" : "#0f5132";
+    el.style.background = esError ? "var(--error-bg)" : "var(--success-bg)";
+    el.style.color = esError ? "var(--error-text)" : "var(--success-text)";
   }
 
   function metric(label, value) {

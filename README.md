@@ -556,6 +556,34 @@ Google de cada persona: solo quien ya tiene acceso al Sheet puede leerlo.
    `js/config.js`, reemplazando `PEGA_ACA_TU_OAUTH_CLIENT_ID...`.
 6. Commit + push.
 
+## Diseño y paleta de colores
+
+Misma paleta en las dos versiones (Web y Streamlit) -- variables CSS en
+`css/style.css` (`:root`, con su bloque `@media (prefers-color-scheme:
+dark)`), reflejadas también en `index.html` y en el `<style>` que inyecta
+`app_presupuesto.py`, y en `.streamlit/config.toml` → `[theme]` para que
+los widgets nativos de Streamlit (botones, checkboxes) usen el mismo azul
+en vez del rojo/coral por defecto de Streamlit:
+
+- **Acento**: `#1d4ed8` (azul) — números de `.metric-value`/`st.metric()`,
+  botones primarios, nav activo, la primera serie de casi todos los
+  gráficos. Antes la web usaba rojo (`#d64545`) acá, sin relación con el
+  resto de la app.
+- **Categórico** (gráficos por categoría/serie): mismos 9 colores que
+  `px.defaults.color_discrete_sequence` — azul, ámbar, teal, rojo, violeta,
+  oliva, cian, rosa, gris — para que un gráfico de "gasto por categoría"
+  se vea igual en ambas versiones.
+- **Estado**: `--success-bg`/`--success-text` (verde), `--warning-bg`/
+  `--warning-text` (ámbar), `--error`/`--error-bg`/`--error-text` (rojo) —
+  el rojo queda reservado solo para errores/negativo de verdad, nunca para
+  una acción o un link (antes `.error` reutilizaba el mismo rojo que el
+  acento).
+- **Barra lateral**: azul-marino (`--sidebar-bg` y variantes claro/oscuro),
+  igual que `section[data-testid="stSidebar"]` de Streamlit — antes era un
+  gris plano que se perdía contra el contenido.
+- Tarjetas (`.metric`, `.card`, `.panel-colapsable`) con borde + sombra
+  sutil (`--shadow-card`) en vez de solo un fondo plano.
+
 ## Estructura
 
 ```

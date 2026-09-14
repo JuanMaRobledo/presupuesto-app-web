@@ -97,8 +97,8 @@ const PaginaDeclaraciones = (() => {
           data: {
             labels: asc.map((f) => f.Anio),
             datasets: [
-              { label: "Patrimonio Líquido", data: asc.map((f) => toNumber(f.PatrimonioLiquido)), borderColor: "#4573d6", backgroundColor: "#4573d6", tension: 0.1 },
-              { label: "Impuesto a Cargo", data: asc.map((f) => toNumber(f.ImpuestoACargo)), borderColor: "#d64545", backgroundColor: "#d64545", tension: 0.1 },
+              { label: "Patrimonio Líquido", data: asc.map((f) => toNumber(f.PatrimonioLiquido)), borderColor: "#1d4ed8", backgroundColor: "#1d4ed8", tension: 0.1 },
+              { label: "Impuesto a Cargo", data: asc.map((f) => toNumber(f.ImpuestoACargo)), borderColor: "#dc2626", backgroundColor: "#dc2626", tension: 0.1 },
             ],
           },
           options: { responsive: true, scales: { y: { ticks: { callback: (v) => fmtMoneda(v) } } } },
@@ -159,8 +159,8 @@ const PaginaDeclaraciones = (() => {
   function mostrarMsg(el, texto, esError) {
     el.hidden = false;
     el.textContent = texto;
-    el.style.background = esError ? "#f8d7da" : "#d1e7dd";
-    el.style.color = esError ? "#842029" : "#0f5132";
+    el.style.background = esError ? "var(--error-bg)" : "var(--success-bg)";
+    el.style.color = esError ? "var(--error-text)" : "var(--success-text)";
   }
 
   return { render };

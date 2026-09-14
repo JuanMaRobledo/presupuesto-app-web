@@ -200,7 +200,7 @@ const PaginaVerificarDatos = (() => {
             ${fmtMoneda(diferencia)}. Revisá si falta cargar algún movimiento de ese mes o si el saldo
             ingresado está mal.</div>`;
         } else {
-          estadoDiv.innerHTML = `<div class="aviso" style="background:#d1e7dd;color:#0f5132;">Conciliación de
+          estadoDiv.innerHTML = `<div class="aviso" style="background:var(--success-bg);color:var(--success-text);">Conciliación de
             ${mesConc} cuadra ✅</div>`;
         }
       }
@@ -221,12 +221,12 @@ const PaginaVerificarDatos = (() => {
           await guardarConciliacionEfectivo(mesConc, saldoInicial, saldoFinal);
           msg.hidden = false;
           msg.textContent = `Saldos de ${mesConc} guardados.`;
-          msg.style.background = "#d1e7dd"; msg.style.color = "#0f5132";
+          msg.style.background = "var(--success-bg)"; msg.style.color = "var(--success-text)";
           await render(container);
         } catch (err) {
           msg.hidden = false;
           msg.textContent = `No pude guardar: ${err.message}`;
-          msg.style.background = "#f8d7da"; msg.style.color = "#842029";
+          msg.style.background = "var(--error-bg)"; msg.style.color = "var(--error-text)";
           console.error(err);
           btn.disabled = false;
           btn.textContent = "💾 Guardar saldos de este mes";

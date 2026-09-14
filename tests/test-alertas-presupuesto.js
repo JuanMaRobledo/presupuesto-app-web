@@ -68,13 +68,17 @@ async function testAlertasPresupuesto() {
   const dispCerca = await page.locator("#disp_9").innerText();
   check(dispCerca.includes("🟡") && dispCerca.includes("95%"),
     `Meta 100.000 con 95% usado: aviso naranja con el % (vi: "${dispCerca}")`);
-  const colorCerca = await page.locator("#disp_9 span").evaluate((el) => el.style.color);
-  check(colorCerca === "rgb(180, 83, 9)", `El aviso "cerca" usa el color naranja esperado (vi: "${colorCerca}")`);
+  // getComputedStyle (no el.style.color) -- el color ahora se asigna vía
+  // var(--warning-text)/var(--error) para que responda a dark mode, así
+  // que el.style.color literal daría el texto "var(--warning-text)" en
+  // vez del valor ya resuelto.
+  const colorCerca = await page.locator("#disp_9 span").evaluate((el) => getComputedStyle(el).color);
+  check(colorCerca === "rgb(146, 64, 14)", `El aviso "cerca" usa el color naranja esperado (--warning-text, vi: "${colorCerca}")`);
 
   const dispPasado = await page.locator("#disp_10").innerText();
   check(dispPasado.includes("⚠️") && dispPasado.includes("de más"),
     `Meta 100.000 con 120% usado: aviso rojo "de más" (vi: "${dispPasado}")`);
-  const colorPasado = await page.locator("#disp_10 span").evaluate((el) => el.style.color);
+  const colorPasado = await page.locator("#disp_10 span").evaluate((el) => getComputedStyle(el).color);
   check(colorPasado === "rgb(220, 38, 38)", `El aviso "pasado" usa el color rojo esperado (vi: "${colorPasado}")`);
 
   // Cambiar la meta a mano recalcula el aviso en vivo (sin recargar el Sheet).

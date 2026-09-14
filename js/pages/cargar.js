@@ -44,9 +44,10 @@ const PaginaCargar = (() => {
     return `<div class="metric"><div class="metric-label">${label}</div><div class="metric-value">${value}</div></div>`;
   }
 
+  // Mismos colores que .pill-ok/.pill-skip (app_presupuesto.py).
   function pill(texto, tipo) {
-    const color = tipo === "ok" ? "#0a7d3c" : "#8a6d00";
-    const bg = tipo === "ok" ? "#e6f6ec" : "#fff6e0";
+    const color = tipo === "ok" ? "var(--success-text)" : "var(--warning-text)";
+    const bg = tipo === "ok" ? "var(--success-bg)" : "var(--warning-bg)";
     return `<span style="color:${color};background:${bg};border-radius:12px;padding:2px 10px;font-size:0.8em;font-weight:600;">${texto}</span>`;
   }
 

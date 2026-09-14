@@ -892,11 +892,11 @@ const PaginaInversiones = (() => {
       const datasets = [];
       if (serieValor.length) datasets.push({
         label: "Valor de Cartera", data: serieValor.map((f) => ({ x: f.fechaISO, y: f.valor })),
-        borderColor: "#4573d6", backgroundColor: "#4573d6", tension: 0.1,
+        borderColor: "#1d4ed8", backgroundColor: "#1d4ed8", tension: 0.1,
       });
       if (serieAportes.length) datasets.push({
         label: "Aportes Netos Acumulados", data: serieAportes.map((f) => ({ x: f.fechaISO, y: f.acumulado })),
-        borderColor: "#45a06a", backgroundColor: "#45a06a", tension: 0.1,
+        borderColor: "#0d9488", backgroundColor: "#0d9488", tension: 0.1,
       });
       charts[`crecimiento_${moneda}`] = new Chart(canvas.getContext("2d"), {
         type: "line",
@@ -911,11 +911,11 @@ const PaginaInversiones = (() => {
       const datasets = [];
       if (serieValor.length) datasets.push({
         label: "Valor de Cartera (USD)", data: serieValor.map((f) => ({ x: f.fechaISO, y: f.valor })),
-        borderColor: "#4573d6", backgroundColor: "#4573d6", tension: 0.1, yAxisID: "y",
+        borderColor: "#1d4ed8", backgroundColor: "#1d4ed8", tension: 0.1, yAxisID: "y",
       });
       if (serieAportes.length) datasets.push({
         label: "Aportes Netos Acumulados (COP)", data: serieAportes.map((f) => ({ x: f.fechaISO, y: f.acumulado })),
-        borderColor: "#45a06a", backgroundColor: "#45a06a", tension: 0.1, yAxisID: "y1",
+        borderColor: "#0d9488", backgroundColor: "#0d9488", tension: 0.1, yAxisID: "y1",
       });
       charts[`crecimiento_${moneda}`] = new Chart(canvas.getContext("2d"), {
         type: "line",
@@ -1550,8 +1550,8 @@ const PaginaInversiones = (() => {
   function mostrarMsgInv(el, texto, esError) {
     el.hidden = false;
     el.textContent = texto;
-    el.style.background = esError ? "#f8d7da" : "#d1e7dd";
-    el.style.color = esError ? "#842029" : "#0f5132";
+    el.style.background = esError ? "var(--error-bg)" : "var(--success-bg)";
+    el.style.color = esError ? "var(--error-text)" : "var(--success-text)";
   }
 
   function renderChartsHistorial(div, cierres) {
@@ -1592,7 +1592,7 @@ const PaginaInversiones = (() => {
       const puntos = fechasOrdenadas.map((fISO) => { acumulado += porFecha[m][fISO]; return { x: fISO, y: acumulado }; });
       charts[`hist_acum_${m}`] = new Chart(div.querySelector(`#hist_chart_acumulado_${m}`).getContext("2d"), {
         type: "line",
-        data: { datasets: [{ label: `Acumulado (${m})`, data: puntos, borderColor: "#4573d6", backgroundColor: "#4573d6", tension: 0.1 }] },
+        data: { datasets: [{ label: `Acumulado (${m})`, data: puntos, borderColor: "#1d4ed8", backgroundColor: "#1d4ed8", tension: 0.1 }] },
         options: { responsive: true, parsing: false, plugins: { legend: { display: false }, title: { display: true, text: m } },
           scales: { x: { type: "category" } } },
       });
@@ -1646,7 +1646,7 @@ const PaginaInversiones = (() => {
       const puntos = serie.map((f) => { acumulado += f.valor; return { x: f.fechaISO, y: acumulado }; });
       charts[`hist_pasivo_${m}`] = new Chart(canvas.getContext("2d"), {
         type: "line",
-        data: { datasets: [{ label: `Acumulado (${m})`, data: puntos, borderColor: "#8a56c9", backgroundColor: "#8a56c9", tension: 0.1 }] },
+        data: { datasets: [{ label: `Acumulado (${m})`, data: puntos, borderColor: "#7c3aed", backgroundColor: "#7c3aed", tension: 0.1 }] },
         options: { responsive: true, parsing: false, plugins: { title: { display: true, text: m }, legend: { display: false } },
           scales: { x: { type: "category" } } },
       });
@@ -1671,8 +1671,8 @@ const PaginaInversiones = (() => {
         data: {
           labels: plataformas,
           datasets: [
-            { label: "Depósito", data: plataformas.map((p) => porPlat[p].dep), backgroundColor: "#4573d6" },
-            { label: "Retiro", data: plataformas.map((p) => porPlat[p].ret), backgroundColor: "#d64545" },
+            { label: "Depósito", data: plataformas.map((p) => porPlat[p].dep), backgroundColor: "#1d4ed8" },
+            { label: "Retiro", data: plataformas.map((p) => porPlat[p].ret), backgroundColor: "#dc2626" },
           ],
         },
         options: { indexAxis: "y", responsive: true,
@@ -1708,7 +1708,11 @@ const PaginaInversiones = (() => {
     }
   }
 
-  const PALETA = ["#d64545", "#4573d6", "#45a06a", "#d69a45", "#8a56c9", "#45b8c9", "#c9457e", "#a3a3a3"];
+  // Misma paleta categórica que px.defaults.color_discrete_sequence
+  // (app_presupuesto.py) -- arranca con el mismo azul de .metric-value,
+  // para que los gráficos de categorías se sientan parte de la misma app
+  // en las dos versiones.
+  const PALETA = ["#1d4ed8", "#d97706", "#0d9488", "#dc2626", "#7c3aed", "#65a30d", "#0891b2", "#be185d", "#4b5563"];
 
   function metric(label, value) {
     return `<div class="metric"><div class="metric-label">${label}</div><div class="metric-value">${value}</div></div>`;

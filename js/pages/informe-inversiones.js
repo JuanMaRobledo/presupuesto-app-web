@@ -463,7 +463,7 @@ const PaginaInformeInversiones = (() => {
             de hoy, perdiste ${fmtMoneda(Math.abs(fx.diferencia))} (${Math.abs(pctFx).toFixed(1)}%) solo por el
             tipo de cambio, sin contar cómo les fue a las posiciones en sí.</div>`;
         } else {
-          html += `<div class="aviso" style="background:#d1e7dd;color:#0f5132;">✅ El dólar subió frente al peso
+          html += `<div class="aviso" style="background:var(--success-bg);color:var(--success-text);">✅ El dólar subió frente al peso
             desde que hiciste estos aportes: en pesos de hoy, ganaste ${fmtMoneda(fx.diferencia)}
             (${pctFx.toFixed(1)}%) solo por el tipo de cambio, sin contar cómo les fue a las posiciones en
             sí.</div>`;
@@ -625,7 +625,7 @@ const PaginaInformeInversiones = (() => {
     charts.aportes?.destroy();
     charts.aportes = new Chart(div.querySelector("#ii_chart_aportes").getContext("2d"), {
       type: "bar",
-      data: { labels: entradas.map((e) => e[0]), datasets: [{ label: "Monto Transferido (COP)", data: entradas.map((e) => e[1]), backgroundColor: "#4573d6" }] },
+      data: { labels: entradas.map((e) => e[0]), datasets: [{ label: "Monto Transferido (COP)", data: entradas.map((e) => e[1]), backgroundColor: "#1d4ed8" }] },
       options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false } } },
     });
   }

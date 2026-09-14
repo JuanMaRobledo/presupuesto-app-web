@@ -198,9 +198,9 @@ const PaginaResumen = (() => {
     div.innerHTML = `<canvas id="chart_tendencia_resumen" height="160"></canvas>`;
     if (chartTendencia) chartTendencia.destroy();
     const conceptos = [
-      { col: "IngresosGanados", label: "Ingresos ganados", color: "#4573d6" },
-      { col: "GastosPersonales", label: "Gastos personales", color: "#d64545" },
-      { col: "DisponibleMes", label: "Disponible del mes", color: "#45a06a" },
+      { col: "IngresosGanados", label: "Ingresos ganados", color: "#1d4ed8" },
+      { col: "GastosPersonales", label: "Gastos personales", color: "#dc2626" },
+      { col: "DisponibleMes", label: "Disponible del mes", color: "#0d9488" },
     ];
     chartTendencia = new Chart(div.querySelector("#chart_tendencia_resumen").getContext("2d"), {
       type: "bar",

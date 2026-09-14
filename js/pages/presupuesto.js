@@ -153,8 +153,8 @@ const PaginaPresupuesto = (() => {
         if (meta <= 0) return "—";
         const disponible = meta - real;
         const pctUsado = (real / meta) * 100;
-        if (disponible < 0) return `<span style="color:#dc2626;">⚠️ ${fmtMoneda(-disponible)} de más</span>`;
-        if (pctUsado >= 90) return `<span style="color:#b45309;">🟡 ${fmtMoneda(disponible)} disponible (${pctUsado.toFixed(0)}% usado)</span>`;
+        if (disponible < 0) return `<span style="color:var(--error);">⚠️ ${fmtMoneda(-disponible)} de más</span>`;
+        if (pctUsado >= 90) return `<span style="color:var(--warning-text);">🟡 ${fmtMoneda(disponible)} disponible (${pctUsado.toFixed(0)}% usado)</span>`;
         return `${fmtMoneda(disponible)} disponible`;
       };
 
@@ -218,14 +218,14 @@ const PaginaPresupuesto = (() => {
             if (input) { input.value = valor; actualizarDisponible(input); }
           }
           msgSug.hidden = false;
-          msgSug.style.background = "#d1e7dd";
-          msgSug.style.color = "#0f5132";
+          msgSug.style.background = "var(--success-bg)";
+          msgSug.style.color = "var(--success-text)";
           msgSug.textContent = `Metas sugeridas con el promedio de ${mesesPrev.join(", ")} (donde hubo datos) —
             revisalas y ajustalas antes de guardar.`;
         } catch (err) {
           msgSug.hidden = false;
-          msgSug.style.background = "#f8d7da";
-          msgSug.style.color = "#842029";
+          msgSug.style.background = "var(--error-bg)";
+          msgSug.style.color = "var(--error-text)";
           msgSug.textContent = `No pude calcular la sugerencia: ${err.message}`;
           console.error(err);
         } finally {
@@ -246,14 +246,14 @@ const PaginaPresupuesto = (() => {
           }));
           await SheetsApi.batchUpdateRanges(updates);
           msg.hidden = false;
-          msg.style.background = "#d1e7dd";
-          msg.style.color = "#0f5132";
+          msg.style.background = "var(--success-bg)";
+          msg.style.color = "var(--success-text)";
           msg.textContent = "Metas guardadas.";
           await renderContenido(container);
         } catch (err) {
           msg.hidden = false;
-          msg.style.background = "#f8d7da";
-          msg.style.color = "#842029";
+          msg.style.background = "var(--error-bg)";
+          msg.style.color = "var(--error-text)";
           msg.textContent = `No pude guardar: ${err.message}`;
           btn.disabled = false;
           btn.textContent = "💾 Guardar todas las metas";
@@ -273,8 +273,8 @@ const PaginaPresupuesto = (() => {
           data: {
             labels: conMeta.map((c) => c.categoria),
             datasets: [
-              { label: "Presupuesto", data: conMeta.map((c) => c.presupuesto), backgroundColor: "#4573d6" },
-              { label: "Gasto Real", data: conMeta.map((c) => c.gasto_real), backgroundColor: "#d64545" },
+              { label: "Presupuesto", data: conMeta.map((c) => c.presupuesto), backgroundColor: "#1d4ed8" },
+              { label: "Gasto Real", data: conMeta.map((c) => c.gasto_real), backgroundColor: "#dc2626" },
             ],
           },
           options: { responsive: true, scales: { y: { ticks: { callback: (v) => fmtMoneda(v) } } } },

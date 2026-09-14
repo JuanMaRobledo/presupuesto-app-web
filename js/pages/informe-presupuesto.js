@@ -210,7 +210,7 @@ const PaginaInformePresupuesto = (() => {
     charts.ingresos?.destroy();
     charts.ingresos = new Chart(canvas.getContext("2d"), {
       type: "bar",
-      data: { labels: entradas.map((e) => e[0]), datasets: [{ data: entradas.map((e) => e[1]), backgroundColor: "#4573d6" }] },
+      data: { labels: entradas.map((e) => e[0]), datasets: [{ data: entradas.map((e) => e[1]), backgroundColor: "#1d4ed8" }] },
       options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false } } },
     });
   }
@@ -222,7 +222,7 @@ const PaginaInformePresupuesto = (() => {
     charts.gastos?.destroy();
     charts.gastos = new Chart(canvas.getContext("2d"), {
       type: "bar",
-      data: { labels: entradas.map((e) => e[0]), datasets: [{ data: entradas.map((e) => e[1]), backgroundColor: "#d64545" }] },
+      data: { labels: entradas.map((e) => e[0]), datasets: [{ data: entradas.map((e) => e[1]), backgroundColor: "#dc2626" }] },
       options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false } } },
     });
   }
@@ -269,9 +269,9 @@ const PaginaInformePresupuesto = (() => {
       data: {
         labels: filas.map((f) => f.Mes),
         datasets: [
-          { label: "Ingresos ganados", data: filas.map((f) => toNumber(f.IngresosGanados)), backgroundColor: "#4573d6" },
-          { label: "Gastos personales", data: filas.map((f) => toNumber(f.GastosPersonales)), backgroundColor: "#d64545" },
-          { label: "Disponible del mes", data: filas.map((f) => toNumber(f.DisponibleMes)), backgroundColor: "#45a06a" },
+          { label: "Ingresos ganados", data: filas.map((f) => toNumber(f.IngresosGanados)), backgroundColor: "#1d4ed8" },
+          { label: "Gastos personales", data: filas.map((f) => toNumber(f.GastosPersonales)), backgroundColor: "#dc2626" },
+          { label: "Disponible del mes", data: filas.map((f) => toNumber(f.DisponibleMes)), backgroundColor: "#0d9488" },
         ],
       },
       options: { responsive: true, scales: { x: { type: "category" }, y: { ticks: { callback: (v) => fmtMoneda(v) } } } },
@@ -280,7 +280,7 @@ const PaginaInformePresupuesto = (() => {
     charts.tasa?.destroy();
     charts.tasa = new Chart(div.querySelector("#ip_chart_tasa").getContext("2d"), {
       type: "line",
-      data: { labels: filas.map((f) => f.Mes), datasets: [{ label: "Tasa de ahorro %", data: tasas, borderColor: "#8a56c9", backgroundColor: "#8a56c9", tension: 0.1 }] },
+      data: { labels: filas.map((f) => f.Mes), datasets: [{ label: "Tasa de ahorro %", data: tasas, borderColor: "#7c3aed", backgroundColor: "#7c3aed", tension: 0.1 }] },
       options: { responsive: true, scales: { x: { type: "category" } } },
     });
   }
@@ -303,7 +303,7 @@ const PaginaInformePresupuesto = (() => {
       const textos = pasadas.map((c) => `${c.categoria} (${moneyMd(c.gastoReal - c.presupuesto)} de más)`);
       html += `<div class="aviso">Te pasaste del presupuesto en: ${textos.join(", ")}</div>`;
     } else {
-      html += `<div class="aviso" style="background:#d1e7dd;color:#0f5132;">No te pasaste del presupuesto en ninguna categoría con meta definida.</div>`;
+      html += `<div class="aviso" style="background:var(--success-bg);color:var(--success-text);">No te pasaste del presupuesto en ninguna categoría con meta definida.</div>`;
     }
     html += `<p class="caption">Corresponde al mes actualmente seleccionado en 📋 Presupuesto — cambialo ahí si
       querés ver otro mes (no depende del alcance elegido arriba).</p>`;

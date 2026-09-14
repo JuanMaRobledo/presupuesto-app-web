@@ -1,19 +1,59 @@
+/* Paleta compartida con la versión Streamlit (mismos tonos, en los dos
+   stacks) -- antes el acento acá era rojo (#d64545, superpuesto también
+   para .error) mientras Streamlit ya usaba azul (#1d4ed8) para los
+   números de st.metric() y una barra lateral azul-marino con pills de
+   estado -- dos sistemas visuales distintos para la misma app. Ahora
+   ambas comparten el mismo azul de acento (también el de los gráficos:
+   torta/barras de Inversiones), el mismo verde/ámbar de estado, y el
+   mismo fondo/borde de tarjeta -- el rojo queda reservado solo para
+   errores de verdad (--error), nunca para una acción o un link. */
 :root {
   color-scheme: light dark;
   --bg: #ffffff;
-  --bg-alt: #f5f5f7;
-  --text: #1a1a1a;
-  --text-muted: #6b6b6b;
-  --accent: #d64545;
-  --border: #e2e2e2;
+  --bg-alt: #f5f7fa;
+  --text: #1a1d29;
+  --text-muted: #667085;
+  --accent: #1d4ed8;
+  --accent-hover: #1a43b6;
+  --accent-soft: #e8edfc;
+  --border: #e3e7ee;
+  --error: #dc2626;
+  --error-bg: #fde8e8;
+  --error-text: #991b1b;
+  --success-bg: #dcfce7;
+  --success-text: #166534;
+  --warning-bg: #fef3c7;
+  --warning-text: #92400e;
+  --sidebar-bg: #1a1f36;
+  --sidebar-text: #e2e5f1;
+  --sidebar-text-muted: #9aa0c0;
+  --sidebar-rule: #333a56;
+  --sidebar-active: #2c355c;
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.06);
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #16171a;
-    --bg-alt: #212226;
-    --text: #f0f0f0;
-    --text-muted: #a0a0a0;
-    --border: #3a3b3f;
+    --bg: #121319;
+    --bg-alt: #1e2530;
+    --text: #e8eaed;
+    --text-muted: #9aa5b1;
+    --accent: #7aa2f7;
+    --accent-hover: #9ab8f9;
+    --accent-soft: #23304d;
+    --border: #333c4d;
+    --error: #f87171;
+    --error-bg: #4a1515;
+    --error-text: #fca5a5;
+    --success-bg: #0f3d2a;
+    --success-text: #a3d9b8;
+    --warning-bg: #4a3b0a;
+    --warning-text: #ffe69c;
+    --sidebar-bg: #0d1117;
+    --sidebar-text: #d7dde5;
+    --sidebar-text-muted: #8891a3;
+    --sidebar-rule: #2a3241;
+    --sidebar-active: #1c2333;
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3);
   }
 }
 
@@ -24,6 +64,16 @@ body {
   background: var(--bg);
   color: var(--text);
 }
+a { color: var(--accent); }
+a:hover { color: var(--accent-hover); }
+/* .link-portada vive en dos fondos distintos -- la pantalla de login
+   (clara) y la barra lateral (azul-marino, ver #sidebar más abajo) --
+   sin este ajuste general quedaba con el azul de link del navegador,
+   fuera de la paleta; el override específico de #sidebar la vuelve a
+   pintar con los tonos de la barra. */
+.link-portada { color: var(--text-muted); font-size: 0.8rem; }
+.link-portada:hover { color: var(--text); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 #pantalla-login {
   min-height: 100vh;
@@ -48,23 +98,26 @@ button {
   background: var(--accent);
   color: white;
   font-size: 1rem;
+  transition: background-color 0.15s ease;
 }
+#btn-login:hover { background: var(--accent-hover); }
 
 #app {
   display: none;
   min-height: 100vh;
 }
+/* Barra lateral azul-marino, misma paleta que la barra de Streamlit --
+   antes era un simple bg-alt que se perdía contra el contenido. */
 #sidebar {
   width: 260px;
   flex-shrink: 0;
-  background: var(--bg-alt);
-  border-right: 1px solid var(--border);
+  background: var(--sidebar-bg);
   padding: 16px;
   display: flex;
   flex-direction: column;
 }
-#sidebar h2 { margin: 0 0 4px; }
-#sidebar .caption { color: var(--text-muted); font-size: 0.8rem; margin-bottom: 16px; }
+#sidebar h2 { margin: 0 0 4px; color: var(--sidebar-text); }
+#sidebar .caption { color: var(--sidebar-text-muted); font-size: 0.8rem; margin-bottom: 16px; }
 #nav-paginas { display: flex; flex-direction: column; gap: 4px; flex: 1; }
 .nav-btn {
   text-align: left;
@@ -72,29 +125,34 @@ button {
   border-radius: 6px;
   border: none;
   background: transparent;
-  color: var(--text);
+  color: var(--sidebar-text);
+  transition: background-color 0.15s ease;
 }
-.nav-btn:not(:disabled):hover { background: var(--border); }
-.nav-btn:disabled { color: var(--text-muted); cursor: not-allowed; }
+.nav-btn:not(:disabled):hover { background: var(--sidebar-active); }
+.nav-btn:disabled { color: var(--sidebar-text-muted); cursor: not-allowed; }
 .nav-btn.activo { background: var(--accent); color: white; }
 #backup-widget { margin-top: 12px; }
 #backup-widget button {
   width: 100%;
   padding: 8px;
   border-radius: 6px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--sidebar-rule);
   background: transparent;
-  color: var(--text);
+  color: var(--sidebar-text);
 }
-#backup-widget .caption { font-size: 0.75rem; }
+#backup-widget button:hover { background: var(--sidebar-active); }
+#backup-widget .caption { font-size: 0.75rem; color: var(--sidebar-text-muted); }
+#sidebar .link-portada { color: var(--sidebar-text-muted); }
+#sidebar .link-portada:hover { color: var(--sidebar-text); }
 #btn-logout {
   margin-top: 12px;
   padding: 8px;
   border-radius: 6px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--sidebar-rule);
   background: transparent;
-  color: var(--text);
+  color: var(--sidebar-text);
 }
+#btn-logout:hover { background: var(--sidebar-active); }
 
 #contenido { flex: 1; padding: 24px 32px; max-width: 1100px; }
 #contenido h1 { margin-top: 0; }
@@ -155,43 +213,50 @@ h5 { margin: 20px 0 8px; }
 }
 
 .metric-row { display: flex; gap: 16px; flex-wrap: wrap; }
+/* Mismo fondo/borde/radio que .stat-card de Streamlit -- antes era solo
+   un fondo plano, ahora con borde + sombra sutil se lee como una
+   tarjeta, no como una franja de color. Los números en sí (.metric-value)
+   usan el mismo azul que st.metric() del lado de Streamlit. */
 .metric {
   background: var(--bg-alt);
-  border-radius: 8px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
   padding: 12px 16px;
   min-width: 180px;
   flex: 1;
+  box-shadow: var(--shadow-card);
 }
-.metric-label { color: var(--text-muted); font-size: 0.85rem; }
-.metric-value { font-size: 1.5rem; font-weight: 600; margin-top: 4px; }
+/* Sin text-transform:uppercase a propósito -- a diferencia de .stat-label
+   de Streamlit, acá los tests leen el texto renderizado (innerText, que
+   SÍ refleja el CSS text-transform) y comparan contra las etiquetas tal
+   cual están escritas en el código; mantenerlas en su casing normal evita
+   reescribir esas aserciones en toda la suite por un cambio puramente
+   cosmético. */
+.metric-label { color: var(--text-muted); font-size: 0.8rem; }
+.metric-value { font-size: 1.5rem; font-weight: 700; margin-top: 4px; color: var(--accent); }
 
 .aviso {
   margin-top: 24px;
   padding: 12px 16px;
   border-radius: 8px;
-  background: #fff3cd;
-  color: #664d03;
-}
-@media (prefers-color-scheme: dark) {
-  .aviso { background: #4a3b0a; color: #ffe69c; }
+  background: var(--warning-bg);
+  color: var(--warning-text);
 }
 .ok {
   margin-top: 16px;
   padding: 12px 16px;
   border-radius: 8px;
-  background: #d1e7dd;
-  color: #0f5132;
+  background: var(--success-bg);
+  color: var(--success-text);
 }
-@media (prefers-color-scheme: dark) {
-  .ok { background: #0f3d2a; color: #a3d9b8; }
-}
-.error { color: var(--accent); }
+.error { color: var(--error); font-weight: 500; }
 
 .card {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 12px 16px;
   margin: 12px 0;
+  box-shadow: var(--shadow-card);
 }
 
 .checks-row { display: flex; gap: 8px 14px; flex-wrap: wrap; margin: 8px 0; }
@@ -200,6 +265,7 @@ h6 { margin: 16px 0 4px; font-size: 0.85rem; color: var(--text-muted); text-tran
 
 details { margin: 12px 0; }
 details summary { cursor: pointer; color: var(--accent); font-weight: 500; }
+details summary:hover { color: var(--accent-hover); }
 
 /* Secciones colapsables tipo "panel" -- para agrupar bloques densos
    (gráficos, tablas de detalle) en tarjetas separadas en vez de un solo

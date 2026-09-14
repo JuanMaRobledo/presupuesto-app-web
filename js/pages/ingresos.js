@@ -336,8 +336,8 @@ const PaginaIngresos = (() => {
       data: {
         labels: ultimas24.map((f) => f.Periodo),
         datasets: [
-          { label: "Devengos Totales", data: ultimas24.map((f) => toNumber(f.DevengosTotales)), backgroundColor: "#4573d6" },
-          { label: "Descuentos Totales", data: ultimas24.map((f) => toNumber(f.DescuentosTotales)), backgroundColor: "#d64545" },
+          { label: "Devengos Totales", data: ultimas24.map((f) => toNumber(f.DevengosTotales)), backgroundColor: "#1d4ed8" },
+          { label: "Descuentos Totales", data: ultimas24.map((f) => toNumber(f.DescuentosTotales)), backgroundColor: "#dc2626" },
         ],
       },
       options: { responsive: true, scales: { y: { ticks: { callback: (v) => fmtMoneda(v) } } } },
@@ -588,7 +588,7 @@ const PaginaIngresos = (() => {
       if (f.length && catOrdenadas.length) {
         charts.oiCategoria = new Chart(canvas.getContext("2d"), {
           type: "bar",
-          data: { labels: catOrdenadas.map((c) => c[0]), datasets: [{ label: "Valor", data: catOrdenadas.map((c) => c[1]), backgroundColor: "#4573d6" }] },
+          data: { labels: catOrdenadas.map((c) => c[0]), datasets: [{ label: "Valor", data: catOrdenadas.map((c) => c[1]), backgroundColor: "#1d4ed8" }] },
           options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false } },
             scales: { x: { ticks: { callback: (v) => fmtMoneda(v) } } } },
         });
@@ -645,8 +645,8 @@ const PaginaIngresos = (() => {
   function mostrarMsg(el, texto, esError) {
     el.hidden = false;
     el.textContent = texto;
-    el.style.background = esError ? "#f8d7da" : "#d1e7dd";
-    el.style.color = esError ? "#842029" : "#0f5132";
+    el.style.background = esError ? "var(--error-bg)" : "var(--success-bg)";
+    el.style.color = esError ? "var(--error-text)" : "var(--success-text)";
   }
 
   function metric(label, value) {

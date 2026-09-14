@@ -250,7 +250,7 @@ const PaginaAnalisis = (() => {
     if (chartCategorias) chartCategorias.destroy();
     chartCategorias = new Chart(panel.querySelector("#chart_categorias").getContext("2d"), {
       type: "bar",
-      data: { labels: filas.map((f) => f.categoria), datasets: [{ label: "Gasto Real", data: filas.map((f) => f.gasto), backgroundColor: "#4573d6" }] },
+      data: { labels: filas.map((f) => f.categoria), datasets: [{ label: "Gasto Real", data: filas.map((f) => f.gasto), backgroundColor: "#1d4ed8" }] },
       options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false } },
         scales: { x: { ticks: { callback: (v) => fmtMoneda(v) } } } },
     });
@@ -373,7 +373,7 @@ const PaginaAnalisis = (() => {
       if (topCat.length) {
         chartTopCategorias = new Chart(canvas.getContext("2d"), {
           type: "bar",
-          data: { labels: topCat.map((c) => c[0]), datasets: [{ label: "Valor", data: topCat.map((c) => c[1]), backgroundColor: "#d64545" }] },
+          data: { labels: topCat.map((c) => c[0]), datasets: [{ label: "Valor", data: topCat.map((c) => c[1]), backgroundColor: "#dc2626" }] },
           options: { indexAxis: "y", responsive: true, plugins: { legend: { display: false } },
             scales: { x: { ticks: { callback: (v) => fmtMoneda(v) } } } },
         });
@@ -655,7 +655,11 @@ const PaginaAnalisis = (() => {
     return `<div class="metric"><div class="metric-label">${label}</div><div class="metric-value">${value}</div></div>`;
   }
 
-  const PALETA = ["#d64545", "#4573d6", "#45a06a", "#d69a45", "#8a56c9", "#45b8c9", "#c9457e", "#a3a3a3"];
+  // Misma paleta categórica que px.defaults.color_discrete_sequence
+  // (app_presupuesto.py) -- arranca con el mismo azul de .metric-value,
+  // para que los gráficos de categorías se sientan parte de la misma app
+  // en las dos versiones.
+  const PALETA = ["#1d4ed8", "#d97706", "#0d9488", "#dc2626", "#7c3aed", "#65a30d", "#0891b2", "#be185d", "#4b5563"];
 
   return { render };
 })();

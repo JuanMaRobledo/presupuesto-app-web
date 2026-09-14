@@ -80,7 +80,7 @@ const PaginaSaludDatos = (() => {
     const conteo = {};
     for (const f of colillas) conteo[f.Periodo] = (conteo[f.Periodo] || 0) + 1;
     const duplicadas = Object.keys(conteo).filter((p) => conteo[p] > 1);
-    if (!duplicadas.length) { div.innerHTML = '<p class="aviso" style="background:#d1e7dd;color:#0f5132;">✅ No hay quincenas repetidas.</p>'; return; }
+    if (!duplicadas.length) { div.innerHTML = '<p class="aviso" style="background:var(--success-bg);color:var(--success-text);">✅ No hay quincenas repetidas.</p>'; return; }
     const filas = colillas.filter((f) => duplicadas.includes(f.Periodo))
       .sort((a, b) => a.Periodo.localeCompare(b.Periodo) || String(a.FechaPago).localeCompare(String(b.FechaPago)));
     div.innerHTML = `
@@ -112,7 +112,7 @@ const PaginaSaludDatos = (() => {
       if (faltantes.length) faltantesPorAnio[anio] = faltantes;
     }
     if (!Object.keys(faltantesPorAnio).length) {
-      div.innerHTML = '<p class="aviso" style="background:#d1e7dd;color:#0f5132;">✅ No falta ningún comprobante esperado (24 quincenas + primas de junio/diciembre por año, hasta el mes anterior al actual).</p>';
+      div.innerHTML = '<p class="aviso" style="background:var(--success-bg);color:var(--success-text);">✅ No falta ningún comprobante esperado (24 quincenas + primas de junio/diciembre por año, hasta el mes anterior al actual).</p>';
       return;
     }
     div.innerHTML = Object.entries(faltantesPorAnio).map(([anio, faltantes]) =>
@@ -130,7 +130,7 @@ const PaginaSaludDatos = (() => {
         .map((f) => f.Quincena)
     )].sort();
     if (!periodosSospechosos.length) {
-      div.innerHTML = '<p class="aviso" style="background:#d1e7dd;color:#0f5132;">✅ Ninguna "quincena" trae un devengo de Prima de Servicios.</p>';
+      div.innerHTML = '<p class="aviso" style="background:var(--success-bg);color:var(--success-text);">✅ Ninguna "quincena" trae un devengo de Prima de Servicios.</p>';
       return;
     }
     div.innerHTML = `
@@ -151,7 +151,7 @@ const PaginaSaludDatos = (() => {
         try { resultados.push(await corregirPrimaMalEtiquetada(p)); }
         catch (err) { errores.push([p, err.message]); }
       }
-      msg.innerHTML = resultados.map((r) => `<div class="aviso" style="background:#d1e7dd;color:#0f5132;">'${r.periodoViejo}' → '${r.periodoNuevo}' (${r.devengos} devengo(s), ${r.descuentos} descuento(s))</div>`).join("")
+      msg.innerHTML = resultados.map((r) => `<div class="aviso" style="background:var(--success-bg);color:var(--success-text);">'${r.periodoViejo}' → '${r.periodoNuevo}' (${r.devengos} devengo(s), ${r.descuentos} descuento(s))</div>`).join("")
         + errores.map(([p, e]) => `<div class="error">No pude corregir '${p}': ${e}</div>`).join("")
         + (resultados.length ? '<p class="caption">Revisá "🧾 Comprobantes de colillas faltantes" más arriba — la quincena real de ese período probablemente ahora aparezca como faltante.</p>' : "");
       await recargar();
@@ -166,7 +166,7 @@ const PaginaSaludDatos = (() => {
         .map((f) => f.Quincena)
     )].sort();
     if (!periodosCesantiasMal.length) {
-      div.innerHTML = '<p class="aviso" style="background:#d1e7dd;color:#0f5132;">✅ Ninguna "quincena" trae un devengo de Cesantías Año Anterior.</p>';
+      div.innerHTML = '<p class="aviso" style="background:var(--success-bg);color:var(--success-text);">✅ Ninguna "quincena" trae un devengo de Cesantías Año Anterior.</p>';
       return;
     }
     div.innerHTML = `
@@ -189,7 +189,7 @@ const PaginaSaludDatos = (() => {
       }
       msg.innerHTML = resultados.map((r) => {
         const detalle = r.interes ? ` (intereses ${fmtMoneda(r.interes)} → Otros Ingresos)` : "";
-        return `<div class="aviso" style="background:#d1e7dd;color:#0f5132;">'${r.periodoViejo}' → '${r.periodoNuevo}'${detalle}</div>`;
+        return `<div class="aviso" style="background:var(--success-bg);color:var(--success-text);">'${r.periodoViejo}' → '${r.periodoNuevo}'${detalle}</div>`;
       }).join("") + errores.map(([p, e]) => `<div class="error">No pude corregir '${p}': ${e}</div>`).join("")
         + (resultados.length ? '<p class="caption">Revisá "🧾 Comprobantes de colillas faltantes" más arriba.</p>' : "");
       await recargar();
@@ -398,7 +398,7 @@ const PaginaSaludDatos = (() => {
         try {
           const resultado = await recategorizarComercios(mapeo, !chk.checked);
           const total = resultado.efectivo_detalle + resultado.visa_detalle + resultado.mc_detalle;
-          msg.innerHTML = `<div class="aviso" style="background:#d1e7dd;color:#0f5132;">${total} fila(s)
+          msg.innerHTML = `<div class="aviso" style="background:var(--success-bg);color:var(--success-text);">${total} fila(s)
             recategorizadas — ${resultado.efectivo_detalle} en Efectivo, ${resultado.visa_detalle} en Visa,
             ${resultado.mc_detalle} en Mastercard.</div>`;
           await recargar();
@@ -422,7 +422,7 @@ const PaginaSaludDatos = (() => {
       porComercio[f.Comercio][f.Categoria] = (porComercio[f.Comercio][f.Categoria] || 0) + 1;
     }
     const incons = Object.entries(porComercio).filter(([, cats]) => Object.keys(cats).length > 1).sort((a, b) => a[0].localeCompare(b[0]));
-    if (!incons.length) { div.innerHTML = '<p class="aviso" style="background:#d1e7dd;color:#0f5132;">✅ Cada comercio de gastos usa siempre la misma categoría.</p>'; return; }
+    if (!incons.length) { div.innerHTML = '<p class="aviso" style="background:var(--success-bg);color:var(--success-text);">✅ Cada comercio de gastos usa siempre la misma categoría.</p>'; return; }
     div.innerHTML = `
       <div class="aviso">⚠️ ${incons.length} comercio(s) de gastos tienen más de una categoría asignada.</div>
       <div class="tabla-scroll" style="max-height:400px;"><table class="tabla">
@@ -449,7 +449,7 @@ const PaginaSaludDatos = (() => {
     function construirTabla() {
       const base = chk.checked ? otrosIngresos.filter((f) => f.Categoria === "Otro") : otrosIngresos;
       if (!base.length) {
-        tablaDiv.innerHTML = '<p class="aviso" style="background:#d1e7dd;color:#0f5132;">✅ Ningún concepto está en la categoría genérica "Otro".</p>';
+        tablaDiv.innerHTML = '<p class="aviso" style="background:var(--success-bg);color:var(--success-text);">✅ Ningún concepto está en la categoría genérica "Otro".</p>';
         return;
       }
       const porConcepto = {};
@@ -489,7 +489,7 @@ const PaginaSaludDatos = (() => {
         btn.textContent = "Guardando…";
         try {
           const total = await recategorizarConceptosIngreso(mapeo);
-          msg.innerHTML = `<div class="aviso" style="background:#d1e7dd;color:#0f5132;">${total} fila(s) recategorizadas en Otros Ingresos.</div>`;
+          msg.innerHTML = `<div class="aviso" style="background:var(--success-bg);color:var(--success-text);">${total} fila(s) recategorizadas en Otros Ingresos.</div>`;
           await recargar();
         } catch (err) {
           msg.innerHTML = `<div class="error">No pude guardar: ${err.message}</div>`;
@@ -511,7 +511,7 @@ const PaginaSaludDatos = (() => {
       porConcepto[f.Concepto][f.Categoria] = (porConcepto[f.Concepto][f.Categoria] || 0) + 1;
     }
     const incons = Object.entries(porConcepto).filter(([, cats]) => Object.keys(cats).length > 1).sort((a, b) => a[0].localeCompare(b[0]));
-    if (!incons.length) { div.innerHTML = '<p class="aviso" style="background:#d1e7dd;color:#0f5132;">✅ Cada concepto de Otros Ingresos usa siempre la misma categoría.</p>'; return; }
+    if (!incons.length) { div.innerHTML = '<p class="aviso" style="background:var(--success-bg);color:var(--success-text);">✅ Cada concepto de Otros Ingresos usa siempre la misma categoría.</p>'; return; }
     div.innerHTML = `
       <div class="aviso">⚠️ ${incons.length} concepto(s) de Otros Ingresos tienen más de una categoría asignada.</div>
       <div class="tabla-scroll" style="max-height:400px;"><table class="tabla">
