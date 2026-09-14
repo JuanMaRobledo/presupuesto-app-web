@@ -105,9 +105,9 @@ async function gotoLoggedIn(page) {
   const saldoFinalCalc = await page.locator("#fe_saldo_final_calc .metric-value").innerText();
   check(saldoFinalCalc === "$5,080,000", `Flujo: Saldo Final Calculado = 1,200,000 + 4,000,000 + 0 - 150,000 + 30,000 (vi: "${saldoFinalCalc}")`);
 
-  // Desglose: Financiación debe mostrar la cuota de préstamo.
-  await page.click('summary:has-text("Ver desglose del mes")');
-  await page.waitForTimeout(200);
+  // Desglose: Financiación debe mostrar la cuota de préstamo -- el panel
+  // ya viene abierto por defecto (.panel-colapsable), no hace falta
+  // clickearlo (clickearlo lo cerraría en vez de abrirlo).
   const textoDesglose = await page.locator("#fe_desglose").innerText();
   check(textoDesglose.includes("Cuota prestamo"), "Flujo: desglose de Financiación muestra 'Cuota prestamo'");
   check(textoDesglose.includes("Transferencia interna"), "Flujo: desglose de Conciliación (entradas) muestra 'Transferencia interna'");

@@ -223,10 +223,14 @@ const PaginaEstadosFinancieros = (() => {
       if (historial.length >= 2) {
         const divTiempo = panel.querySelector("#be-patrimonio-tiempo");
         divTiempo.innerHTML = `
-          <h5>Patrimonio Neto en el tiempo</h5>
-          <p class="caption">Una foto por día distinto que abriste esta pantalla (no es retroactivo: arranca
-          desde la primera vez que la viste). Dólares no incluidos, mismo criterio que arriba.</p>
-          <canvas id="be_chart_patrimonio" height="160"></canvas>
+          <details class="panel-colapsable" open>
+            <summary>Patrimonio Neto en el tiempo</summary>
+            <div class="panel-colapsable-body">
+              <p class="caption">Una foto por día distinto que abriste esta pantalla (no es retroactivo:
+              arranca desde la primera vez que la viste). Dólares no incluidos, mismo criterio que arriba.</p>
+              <canvas id="be_chart_patrimonio" height="160"></canvas>
+            </div>
+          </details>
         `;
         renderChartPatrimonio(divTiempo.querySelector("#be_chart_patrimonio"), historial);
       }
@@ -357,9 +361,9 @@ const PaginaEstadosFinancieros = (() => {
         <div class="metric-row" id="fe_saldo_final_calc"></div>
         <div id="fe_comparacion"></div>
 
-        <details>
+        <details class="panel-colapsable" open>
           <summary>🔎 Ver desglose del mes</summary>
-          <div id="fe_desglose"></div>
+          <div class="panel-colapsable-body" id="fe_desglose"></div>
         </details>
       `;
 
@@ -643,30 +647,33 @@ const PaginaEstadosFinancieros = (() => {
         <h5>Utilidad Neta del año</h5>
         <div class="metric-row">${metric(`Utilidad Neta ${anioAud}`, fmtMoneda(utilidadNeta))}</div>
 
-        <hr>
-        <h5>Reconciliación de caja del año (cuenta de ahorros)</h5>
-        <p class="caption">Mismas cuatro categorías que Flujo de Efectivo (Operación/Inversión/Financiación/
-        Conciliación), acumuladas para el año completo — arrancando del saldo real de diciembre del año
-        anterior.</p>
-        <div class="metric-row">
-          ${metric("Operación", fmtMoneda(flujoOperacion))}
-          ${metric("Inversión", fmtMoneda(flujoInversion))}
-          ${metric("Financiación", fmtMoneda(flujoFinanciacion))}
-          ${metric("Conciliación", fmtMoneda(flujoConciliacion))}
-        </div>
-        <div class="metric-row">
-          ${metric(`Saldo Inicial (${anioAud - 1}-12-31)`, fmtMoneda(saldoInicialCalc))}
-          ${metric(`Saldo Final Calculado (${anioAud}-12-31)`, fmtMoneda(saldoFinalCalculado))}
-        </div>
-        ${comparacionHtml}
+        <details class="panel-colapsable" open>
+          <summary>Reconciliación de caja del año (cuenta de ahorros)</summary>
+          <div class="panel-colapsable-body">
+            <p class="caption">Mismas cuatro categorías que Flujo de Efectivo (Operación/Inversión/
+            Financiación/Conciliación), acumuladas para el año completo — arrancando del saldo real de
+            diciembre del año anterior.</p>
+            <div class="metric-row">
+              ${metric("Operación", fmtMoneda(flujoOperacion))}
+              ${metric("Inversión", fmtMoneda(flujoInversion))}
+              ${metric("Financiación", fmtMoneda(flujoFinanciacion))}
+              ${metric("Conciliación", fmtMoneda(flujoConciliacion))}
+            </div>
+            <div class="metric-row">
+              ${metric(`Saldo Inicial (${anioAud - 1}-12-31)`, fmtMoneda(saldoInicialCalc))}
+              ${metric(`Saldo Final Calculado (${anioAud}-12-31)`, fmtMoneda(saldoFinalCalculado))}
+            </div>
+            ${comparacionHtml}
 
-        <details>
-          <summary>Ver detalle mes a mes</summary>
-          <div class="tabla-scroll" style="max-height:440px;"><table class="tabla" id="aud_mes_tabla"></table></div>
-          <p class="caption">El 'Saldo Final Calculado' es la cadena acumulada mes a mes desde el saldo real
-          de diciembre anterior — no depende de si guardaste un saldo manual ese mes en particular. 'Saldo
-          Final Real' solo aparece si guardaste una conciliación para ese mes específico en Flujo de
-          Efectivo.</p>
+            <details>
+              <summary>Ver detalle mes a mes</summary>
+              <div class="tabla-scroll" style="max-height:440px;"><table class="tabla" id="aud_mes_tabla"></table></div>
+              <p class="caption">El 'Saldo Final Calculado' es la cadena acumulada mes a mes desde el saldo real
+              de diciembre anterior — no depende de si guardaste un saldo manual ese mes en particular. 'Saldo
+              Final Real' solo aparece si guardaste una conciliación para ese mes específico en Flujo de
+              Efectivo.</p>
+            </details>
+          </div>
         </details>
       `;
 
