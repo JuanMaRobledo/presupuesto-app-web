@@ -77,27 +77,32 @@ const PaginaDeudas = (() => {
             <p class="caption">${deudaUsd[1] || ""}</p>
           ` : ""}
 
-          <canvas id="chart_deudas_pie" height="140"></canvas>
+          <details class="panel-colapsable" open>
+            <summary>📊 Desglose por entidad</summary>
+            <div class="panel-colapsable-body">
+              <canvas id="chart_deudas_pie" height="140"></canvas>
 
-          <div class="tabla-scroll">
-            <table class="tabla">
-              <thead><tr><th>Entidad</th><th>Tipo de Crédito</th><th>Saldo Actual</th><th>Tasa E.A.</th>
-                <th>Cuota Mensual</th><th>% Pagado</th><th>Meses Restantes Est.</th><th>Fecha Est. de Pago Total</th></tr></thead>
-              <tbody>${deudas.map((f) => `<tr>
-                <td>${f.Entidad ?? ""}</td>
-                <td>${f.TipoCredito ?? ""}</td>
-                <td>${fmtCampo(f.SaldoActual, fmtMoneda)}</td>
-                <td>${fmtCampo(f.TasaEA, (v) => (v * 100).toFixed(2) + "%")}</td>
-                <td>${fmtCampo(f.CuotaMensual, fmtMoneda)}</td>
-                <td>${fmtCampo(f.PctPagado, (v) => (v * 100).toFixed(1) + "%")}</td>
-                <td>${fmtCampo(f.MesesRestantes, (v) => v.toFixed(0))}</td>
-                <td>${f.FechaEstPago || "-"}</td>
-              </tr>`).join("")}</tbody>
-            </table>
-          </div>
+              <div class="tabla-scroll">
+                <table class="tabla">
+                  <thead><tr><th>Entidad</th><th>Tipo de Crédito</th><th>Saldo Actual</th><th>Tasa E.A.</th>
+                    <th>Cuota Mensual</th><th>% Pagado</th><th>Meses Restantes Est.</th><th>Fecha Est. de Pago Total</th></tr></thead>
+                  <tbody>${deudas.map((f) => `<tr>
+                    <td>${f.Entidad ?? ""}</td>
+                    <td>${f.TipoCredito ?? ""}</td>
+                    <td>${fmtCampo(f.SaldoActual, fmtMoneda)}</td>
+                    <td>${fmtCampo(f.TasaEA, (v) => (v * 100).toFixed(2) + "%")}</td>
+                    <td>${fmtCampo(f.CuotaMensual, fmtMoneda)}</td>
+                    <td>${fmtCampo(f.PctPagado, (v) => (v * 100).toFixed(1) + "%")}</td>
+                    <td>${fmtCampo(f.MesesRestantes, (v) => v.toFixed(0))}</td>
+                    <td>${f.FechaEstPago || "-"}</td>
+                  </tr>`).join("")}</tbody>
+                </table>
+              </div>
 
-          <h5>Cuota mensual por entidad</h5>
-          <canvas id="chart_deudas_cuotas" height="100"></canvas>
+              <h5>Cuota mensual por entidad</h5>
+              <canvas id="chart_deudas_cuotas" height="100"></canvas>
+            </div>
+          </details>
         `;
 
         if (chartPie) chartPie.destroy();

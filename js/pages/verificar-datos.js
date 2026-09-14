@@ -173,9 +173,9 @@ const PaginaVerificarDatos = (() => {
         <div class="aviso" id="vd_msg" hidden></div>
         <div class="metric-row" id="vd_metrics"></div>
         <div id="vd_estado"></div>
-        <details id="vd_hist_det">
+        <details class="panel-colapsable" id="vd_hist_det">
           <summary>Ver histórico de conciliación (${base.conciliacion.length} mes(es) con saldos guardados)</summary>
-          <div id="vd_hist"></div>
+          <div class="panel-colapsable-body" id="vd_hist"></div>
         </details>
       `;
       if (!base.conciliacion.length) formDiv.querySelector("#vd_hist_det").style.display = "none";

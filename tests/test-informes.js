@@ -171,9 +171,14 @@ async function testSaludDatos() {
   await page.click('.nav-btn:has-text("🔍 Salud de los Datos")');
   await page.waitForTimeout(600);
 
+  // Cada chequeo de Salud de los Datos ahora es un panel colapsable
+  // cerrado por defecto -- hay que abrirlo antes de leer su texto o
+  // clickear algo adentro.
+  await page.click('summary:has-text("Quincenas duplicadas")');
   const dupTexto = await page.locator("#sd-duplicadas").innerText();
   check(dupTexto.includes("2a quincena jun-2025"), `Detecta la quincena duplicada (vi: "${dupTexto}")`);
 
+  await page.click('summary:has-text("Primas mal etiquetadas")');
   const primasTexto = await page.locator("#sd-primas").innerText();
   check(primasTexto.includes("2a quincena jul-2025") && primasTexto.includes("Corregir"), `Detecta la Prima mal etiquetada (vi: "${primasTexto.slice(0, 200)}")`);
 
@@ -188,6 +193,7 @@ async function testSaludDatos() {
 
   // Recategorizar el comercio "Otros".
   await page.waitForTimeout(300);
+  await page.click('summary:has-text("Gasto sin categorizar")');
   const gastoOtrosTexto = await page.locator("#sd-gasto-otros").innerText();
   check(gastoOtrosTexto.includes("TIENDA X"), `Muestra el comercio en 'Otros' para recategorizar (vi: "${gastoOtrosTexto.slice(0, 200)}")`);
   await page.selectOption(".sd-gasto-nueva-cat", "Mercado y Supermercado");

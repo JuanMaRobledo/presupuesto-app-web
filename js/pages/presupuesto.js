@@ -264,8 +264,12 @@ const PaginaPresupuesto = (() => {
       const chartWrap = contenido.querySelector("#pr_chart_wrap");
       if (conMeta.length) {
         chartWrap.innerHTML = `
-          <h4>Presupuesto vs. gasto real (categorías con meta definida)</h4>
-          <canvas id="pr_chart" height="100"></canvas>
+          <details class="panel-colapsable" open>
+            <summary>Presupuesto vs. gasto real (categorías con meta definida)</summary>
+            <div class="panel-colapsable-body">
+              <canvas id="pr_chart" height="100"></canvas>
+            </div>
+          </details>
         `;
         if (chart) chart.destroy();
         chart = new Chart(chartWrap.querySelector("#pr_chart").getContext("2d"), {

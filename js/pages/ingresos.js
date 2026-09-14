@@ -318,7 +318,10 @@ const PaginaIngresos = (() => {
       </div>
       <h5>Tendencia por quincena (últimas 24)</h5>
       <canvas id="chart_cp_tendencia" height="90"></canvas>
-      <div id="cp_detalle"></div>
+      <details class="panel-colapsable" open>
+        <summary>Detalle por quincena</summary>
+        <div class="panel-colapsable-body" id="cp_detalle"></div>
+      </details>
     `;
 
     const anioSel = panel.querySelector("#cp_anio");

@@ -240,12 +240,17 @@ const PaginaAnalisis = (() => {
       <p class="caption">Vista devengado: total histórico por categoría, cada compra contada en su propia
       fecha.</p>
       <canvas id="chart_categorias" height="${Math.max(320, 24 * filas.length)}"></canvas>
-      <div class="tabla-scroll">
-        <table class="tabla">
-          <thead><tr><th>Categoría</th><th>Gasto Real</th></tr></thead>
-          <tbody>${filas.map((f) => `<tr><td>${f.categoria}</td><td>${fmtMoneda(f.gasto)}</td></tr>`).join("")}</tbody>
-        </table>
-      </div>
+      <details class="panel-colapsable">
+        <summary>Ver tabla de categorías</summary>
+        <div class="panel-colapsable-body">
+          <div class="tabla-scroll">
+            <table class="tabla">
+              <thead><tr><th>Categoría</th><th>Gasto Real</th></tr></thead>
+              <tbody>${filas.map((f) => `<tr><td>${f.categoria}</td><td>${fmtMoneda(f.gasto)}</td></tr>`).join("")}</tbody>
+            </table>
+          </div>
+        </div>
+      </details>
     `;
     if (chartCategorias) chartCategorias.destroy();
     chartCategorias = new Chart(panel.querySelector("#chart_categorias").getContext("2d"), {
@@ -456,8 +461,12 @@ const PaginaAnalisis = (() => {
           }).join("")}
         </div>
         <canvas id="es_chart" height="200"></canvas>
-        <h5>Detalle por categoría</h5>
-        <div class="tabla-scroll"><table class="tabla" id="es_tabla"></table></div>
+        <details class="panel-colapsable">
+          <summary>Detalle por categoría</summary>
+          <div class="panel-colapsable-body">
+            <div class="tabla-scroll"><table class="tabla" id="es_tabla"></table></div>
+          </div>
+        </details>
         <div id="es_aviso_sin_clasificar"></div>
       `;
 

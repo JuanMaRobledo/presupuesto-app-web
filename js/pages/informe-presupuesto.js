@@ -170,29 +170,52 @@ const PaginaInformePresupuesto = (() => {
         Cesantías (intereses o retiro del fondo) — ya están incluidos en "Ingresos totales".</p>`;
     }
 
-    html += `<hr><h4>Ingresos</h4>
-      <div class="metric-row">
-        ${metric("Colillas de pago", fmtMoneda(d.ingresosColillas))}
-        ${metric("Otros ingresos", fmtMoneda(d.otrosIngresos))}
-      </div>
-      <canvas id="ip_chart_ingresos"></canvas>`;
+    html += `
+      <details class="panel-colapsable" open>
+        <summary>Ingresos</summary>
+        <div class="panel-colapsable-body">
+          <div class="metric-row">
+            ${metric("Colillas de pago", fmtMoneda(d.ingresosColillas))}
+            ${metric("Otros ingresos", fmtMoneda(d.otrosIngresos))}
+          </div>
+          <canvas id="ip_chart_ingresos"></canvas>
+        </div>
+      </details>
+    `;
 
-    html += `<h4>Gastos</h4>
-      <div class="metric-row">
-        ${metric("Gasto de consumo (sin inversiones ni ahorro)", fmtMoneda(d.gasto_operativo))}
-        ${metric("Descuentos de nómina", fmtMoneda(d.descuentosNomina))}
-        ${metric("Aportes a inversión", fmtMoneda(d.gasto_inversiones))}
-      </div>
-      <canvas id="ip_chart_gastos"></canvas>`;
-    if (d.gastoSinCategorizar > 0) {
-      const pctOtros = d.gastoReal ? (d.gastoSinCategorizar / d.gastoReal * 100) : 0;
-      html += `<div class="aviso">⚠️ ${moneyMd(d.gastoSinCategorizar)} (${pctOtros.toFixed(0)}% del gasto) está
-        en la categoría genérica "Otros" — revisalo en 📊 Análisis → Movimientos.</div>`;
-    }
+    html += `
+      <details class="panel-colapsable" open>
+        <summary>Gastos</summary>
+        <div class="panel-colapsable-body">
+          <div class="metric-row">
+            ${metric("Gasto de consumo (sin inversiones ni ahorro)", fmtMoneda(d.gasto_operativo))}
+            ${metric("Descuentos de nómina", fmtMoneda(d.descuentosNomina))}
+            ${metric("Aportes a inversión", fmtMoneda(d.gasto_inversiones))}
+          </div>
+          <canvas id="ip_chart_gastos"></canvas>
+          ${d.gastoSinCategorizar > 0 ? (() => {
+            const pctOtros = d.gastoReal ? (d.gastoSinCategorizar / d.gastoReal * 100) : 0;
+            return `<div class="aviso">⚠️ ${moneyMd(d.gastoSinCategorizar)} (${pctOtros.toFixed(0)}% del gasto)
+              está en la categoría genérica "Otros" — revisalo en 📊 Análisis → Movimientos.</div>`;
+          })() : ""}
+        </div>
+      </details>
+    `;
 
-    html += `<h4>Esencial vs. no esencial</h4><div id="ip_esenciales"></div>`;
-    html += `<hr><h4>Evolución mensual (efectivo real, últimos 12 meses)</h4><div id="ip_evolucion"></div>`;
-    html += `<hr><h4>Presupuesto vs. real</h4><div id="ip_presupuesto"></div>`;
+    html += `
+      <details class="panel-colapsable" open>
+        <summary>Esencial vs. no esencial</summary>
+        <div class="panel-colapsable-body" id="ip_esenciales"></div>
+      </details>
+      <details class="panel-colapsable" open>
+        <summary>Evolución mensual (efectivo real, últimos 12 meses)</summary>
+        <div class="panel-colapsable-body" id="ip_evolucion"></div>
+      </details>
+      <details class="panel-colapsable" open>
+        <summary>Presupuesto vs. real</summary>
+        <div class="panel-colapsable-body" id="ip_presupuesto"></div>
+      </details>
+    `;
 
     contenido.innerHTML = html;
 

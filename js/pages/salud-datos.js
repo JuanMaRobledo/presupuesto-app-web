@@ -28,31 +28,30 @@ const PaginaSaludDatos = (() => {
       ]);
       const categoriasGasto = (rawCat.categorias_gasto || []).map((r) => r[0]).filter(Boolean);
 
-      contenido.innerHTML = `
-        <h4>📅 Quincenas duplicadas en Colillas de Pago</h4>
-        <div id="sd-duplicadas"></div>
-        <hr>
-        <h4>🧾 Comprobantes de colillas faltantes</h4>
-        <div id="sd-faltantes"></div>
-        <hr>
-        <h4>🎁 Primas mal etiquetadas como quincena</h4>
-        <div id="sd-primas"></div>
-        <hr>
-        <h4>💰 Cesantías mal etiquetadas como quincena</h4>
-        <div id="sd-cesantias"></div>
-        <hr>
-        <h4>🗂️ Gasto sin categorizar ("Otros")</h4>
-        <div id="sd-gasto-otros"></div>
-        <hr>
-        <h4>⚠️ Categoría inconsistente por comercio (gastos)</h4>
-        <div id="sd-incons-gastos"></div>
-        <hr>
-        <h4>🔄 Recategorizar Otros Ingresos</h4>
-        <div id="sd-recat-oi"></div>
-        <hr>
-        <h4>⚠️ Categoría inconsistente por concepto (Otros Ingresos)</h4>
-        <div id="sd-incons-oi"></div>
+      // Cada chequeo es su propio panel colapsable -- antes era un solo
+      // scroll largo de 8 secciones separadas por <hr>, difícil de escanear
+      // para ver cuáles están OK y cuáles tienen algo para revisar. Vienen
+      // cerrados por defecto (a diferencia de los paneles de Inversiones/
+      // Estados Financieros): acá lo normal es que la mayoría no tenga
+      // nada para mostrar, así que abrir los 8 de una saturaría más de lo
+      // que ayuda -- el resumen corto en el título alcanza para decidir
+      // cuál abrir.
+      const panelChequeo = (id, titulo) => `
+        <details class="panel-colapsable">
+          <summary>${titulo}</summary>
+          <div class="panel-colapsable-body" id="${id}"></div>
+        </details>
       `;
+      contenido.innerHTML = [
+        panelChequeo("sd-duplicadas", "📅 Quincenas duplicadas en Colillas de Pago"),
+        panelChequeo("sd-faltantes", "🧾 Comprobantes de colillas faltantes"),
+        panelChequeo("sd-primas", "🎁 Primas mal etiquetadas como quincena"),
+        panelChequeo("sd-cesantias", "💰 Cesantías mal etiquetadas como quincena"),
+        panelChequeo("sd-gasto-otros", '🗂️ Gasto sin categorizar ("Otros")'),
+        panelChequeo("sd-incons-gastos", "⚠️ Categoría inconsistente por comercio (gastos)"),
+        panelChequeo("sd-recat-oi", "🔄 Recategorizar Otros Ingresos"),
+        panelChequeo("sd-incons-oi", "⚠️ Categoría inconsistente por concepto (Otros Ingresos)"),
+      ].join("");
       const recargar = () => render(container);
       renderDuplicadas(contenido.querySelector("#sd-duplicadas"), base.colillas);
       renderFaltantes(contenido.querySelector("#sd-faltantes"), base.colillas);
