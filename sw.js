@@ -7,7 +7,7 @@
 // Sin lista de archivos a mano: cachea lo que se vaya pidiendo de verdad,
 // para no tener que mantenerla sincronizada cada vez que se agrega una
 // página nueva en js/pages/.
-const CACHE = "presupuesto-shell-v1";
+const CACHE = "presupuesto-shell-v2";
 
 self.addEventListener("install", () => self.skipWaiting());
 

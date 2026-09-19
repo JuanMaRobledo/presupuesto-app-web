@@ -1,13 +1,13 @@
 {
-  "name": "Presupuesto App",
+  "name": "JMR · Presupuesto personal",
   "short_name": "Presupuesto",
   "description": "Ingresos, gastos, deudas, presupuesto e inversiones — datos en vivo desde tu Google Sheet.",
   "id": "/app.html",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#1d4ed8",
+  "background_color": "#f8fafc",
+  "theme_color": "#020617",
   "lang": "es",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

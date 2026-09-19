@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>💰 Presupuesto Personal</title>
+  <title>JMR · Presupuesto personal</title>
   <link rel="icon" href="icons/icon-192.png" />
 
   <!-- PWA: esta portada es el start_url (ver manifest.json) -- instalable
@@ -11,36 +11,33 @@
        para poder elegir entre la versión Web y la de Streamlit también
        desde la app instalada, no solo desde el navegador. -->
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#1d4ed8" />
+  <meta name="theme-color" content="#020617" />
   <!-- iOS/Safari no lee manifest.json para esto -- usa sus propias meta/link. -->
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Presupuesto" />
   <style>
-    /* Misma paleta que css/style.css (app.html) -- azul de acento para
-       Web, teal para Streamlit (los mismos dos colores que ya usa el
-       gráfico de torta de Inversiones), en vez del rojo/azul de antes que
-       no tenía nada que ver con el resto de la app. */
+    /* Misma identidad visual que css/style.css y el centro financiero. */
     :root {
       color-scheme: light dark;
-      --bg: #ffffff;
-      --bg-alt: #f5f7fa;
-      --text: #1a1d29;
-      --text-muted: #667085;
-      --accent: #1d4ed8;
+      --bg: #f8fafc;
+      --bg-alt: #ffffff;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --accent: #4f46e5;
       --accent-2: #0d9488;
-      --border: #e3e7ee;
+      --border: #e2e8f0;
     }
     @media (prefers-color-scheme: dark) {
       :root {
-        --bg: #121319;
-        --bg-alt: #1e2530;
-        --text: #e8eaed;
-        --text-muted: #9aa5b1;
-        --accent: #7aa2f7;
+        --bg: #020617;
+        --bg-alt: #0f172a;
+        --text: #f8fafc;
+        --text-muted: #94a3b8;
+        --accent: #818cf8;
         --accent-2: #2dd4bf;
-        --border: #333c4d;
+        --border: #334155;
       }
     }
     * { box-sizing: border-box; }
@@ -51,14 +48,41 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 28px;
-      padding: 24px 16px;
+      gap: 24px;
+      padding: 32px 16px;
       font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
       text-align: center;
     }
-    h1 { margin: 0; font-size: 1.6rem; }
+    .hero {
+      width: min(100%, 720px);
+      padding: 34px;
+      border-radius: 24px;
+      background: #020617;
+      color: white;
+      text-align: left;
+      box-shadow: 0 20px 50px rgba(15, 23, 42, .18);
+    }
+    .jmr-mark {
+      display: grid;
+      place-items: center;
+      width: 48px;
+      height: 48px;
+      border-radius: 14px;
+      background: rgba(255,255,255,.1);
+      border: 1px solid rgba(255,255,255,.18);
+      color: white;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .08em;
+    }
+    .eyebrow { margin: 22px 0 8px; color: #7dd3fc; font-size: .75rem; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(1.8rem, 5vw, 2.6rem); letter-spacing: -.03em; }
+    .hero p { margin: 12px 0 0; max-width: 560px; color: #cbd5e1; line-height: 1.65; }
+    .section-heading { width: min(100%, 720px); text-align: left; }
+    .section-heading h2 { margin: 0; font-size: 1.35rem; }
     p.caption { margin: 0; color: var(--text-muted); max-width: 480px; }
     .opciones {
       display: flex;
@@ -74,16 +98,19 @@
       flex-direction: column;
       gap: 10px;
       padding: 28px 24px;
-      border-radius: 14px;
+      border-radius: 16px;
       border: 1px solid var(--border);
       background: var(--bg-alt);
       color: inherit;
       text-decoration: none;
-      transition: transform 0.15s ease, border-color 0.15s ease;
+      box-shadow: 0 1px 2px rgba(15,23,42,.06);
+      text-align: left;
+      transition: transform 0.15s ease, border-color 0.15s ease, box-shadow .15s ease;
     }
     a.tarjeta:hover { transform: translateY(-2px); border-color: var(--accent); box-shadow: 0 4px 16px rgba(16, 24, 40, 0.08); }
     a.tarjeta.streamlit:hover { border-color: var(--accent-2); }
-    .tarjeta .emoji { font-size: 2rem; }
+    .tarjeta .emoji { display:grid; place-items:center; width:48px; height:48px; border-radius:14px; background:var(--accent); color:white; font-size:1.15rem; font-weight:800; }
+    .tarjeta.streamlit .emoji { background: var(--accent-2); }
     .tarjeta h2 { margin: 0; font-size: 1.15rem; }
     .tarjeta p { margin: 0; color: var(--text-muted); font-size: 0.92rem; }
     .tarjeta .etiqueta {
@@ -97,19 +124,28 @@
   </style>
 </head>
 <body>
-  <h1>💰 Presupuesto Personal</h1>
-  <p class="caption">Dos formas de ver los mismos datos — el mismo Google Sheet, en vivo. Elegí con cuál entrar.</p>
+  <section class="hero">
+    <a class="jmr-mark" href="https://cartera-two-eta.vercel.app/" title="Centro financiero JMR">JMR</a>
+    <p class="eyebrow">Finanzas personales</p>
+    <h1>Presupuesto personal</h1>
+    <p>Ingresos, gastos, deudas, inversiones y patrimonio desde tu Google Sheet.</p>
+  </section>
+
+  <div class="section-heading">
+    <h2>Elige cómo ingresar</h2>
+    <p class="caption">Las dos versiones consultan los mismos datos.</p>
+  </div>
 
   <div class="opciones">
     <a class="tarjeta web" href="app.html">
-      <span class="emoji">🌐</span>
+      <span class="emoji">W</span>
       <h2>Versión Web</h2>
       <p>100% estática, sin backend — inicia sesión con tu cuenta de Google y lee/escribe el Sheet directo desde
       el navegador. Rápida, y siempre la más actualizada.</p>
       <span class="etiqueta">Abrir versión Web →</span>
     </a>
     <a class="tarjeta streamlit" href="https://presupuesto-app-jmr.streamlit.app" target="_blank" rel="noopener">
-      <span class="emoji">🐍</span>
+      <span class="emoji">S</span>
       <h2>Versión Streamlit</h2>
       <p>La app original en Python — todavía tiene algunos formularios de escritura que la versión Web no portó
       todavía (ver el README del repo para el detalle).</p>
@@ -117,7 +153,7 @@
     </a>
   </div>
 
-  <footer>presupuesto-app-web</footer>
+  <footer>JMR · Centro financiero</footer>
 
   <script>
     if ("serviceWorker" in navigator) {

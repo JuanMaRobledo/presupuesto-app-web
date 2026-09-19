@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>💰 Presupuesto App (web)</title>
+  <title>JMR · Presupuesto personal</title>
   <link rel="icon" href="icons/icon-192.png" />
   <link rel="stylesheet" href="css/style.css" />
 
@@ -12,7 +12,7 @@
        ícono y splash screen propios en vez de abrir como una pestaña más
        del navegador. Ver manifest.json y sw.js (service worker). -->
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#1d4ed8" />
+  <meta name="theme-color" content="#020617" />
   <!-- iOS/Safari no lee manifest.json para esto -- usa sus propias meta/link. -->
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -21,22 +21,27 @@
 </head>
 <body>
   <div id="pantalla-login">
-    <h1>💰 Presupuesto App</h1>
-    <p>
-      Versión web estática (sin Streamlit) — en construcción. Iniciá sesión con la misma cuenta de Google
-      que tiene acceso al Sheet de presupuesto para ver tus datos.
-    </p>
-    <button id="btn-login">Iniciar sesión con Google</button>
-    <p><a href="index.html" class="link-portada">← Elegir otra versión (Web/Streamlit)</a></p>
+    <div class="login-card">
+      <a class="jmr-mark" href="https://cartera-two-eta.vercel.app/" title="Centro financiero JMR">JMR</a>
+      <h1>Presupuesto personal</h1>
+      <p>
+        Inicia sesión con la cuenta de Google que tiene acceso a tu hoja de presupuesto.
+      </p>
+      <button id="btn-login">Iniciar sesión con Google</button>
+      <p><a href="index.html" class="link-portada">← Elegir otra versión</a></p>
+    </div>
   </div>
 
   <div id="app">
     <div id="sidebar">
-      <h2>💰 Presupuesto</h2>
+      <div class="brand-row">
+        <a class="jmr-mark" href="https://cartera-two-eta.vercel.app/" title="Centro financiero JMR">JMR</a>
+        <div class="brand-copy"><h2>Presupuesto</h2><p class="caption">Finanzas personales</p></div>
+      </div>
       <p class="caption">Los datos se leen en vivo de tu Google Sheet.</p>
       <div id="nav-paginas"></div>
       <div id="backup-widget"></div>
-      <a href="index.html" class="link-portada" style="display:block;margin-bottom:8px;">← Elegir otra versión (Web/Streamlit)</a>
+      <a href="index.html" class="link-portada" style="display:block;margin-bottom:8px;">← Elegir otra versión</a>
       <button id="btn-logout">Cerrar sesión</button>
     </div>
     <div id="contenido"></div>

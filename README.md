@@ -1,5 +1,9 @@
 # Presupuesto App — versión web (GitHub Pages)
 
+> Aplicación oficial de presupuesto del ecosistema **JMR · Centro financiero**.
+> [Volver al centro financiero](https://cartera-two-eta.vercel.app/) ·
+> Repositorio canónico: `JuanMaRobledo/presupuesto-app-web`.
+
 Versión estática (HTML/CSS/JS puro, sin Streamlit ni backend) de
 [presupuesto-app](https://github.com/JuanMaRobledo/presupuesto-app). Corre
 enteramente en el navegador: quien la abre inicia sesión con su propia cuenta
