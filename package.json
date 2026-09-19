@@ -12,5 +12,6 @@
   },
   "dependencies": {
     "@vercel/functions": "^3.4.3"
-  }
+  },
+  "type": "module"
 }
