@@ -43,6 +43,21 @@ const PaginaResumen = (() => {
         </div>
       </div>
 
+      <section id="resumen-mensual" class="resumen-mensual" aria-labelledby="titulo-resumen-mensual">
+        <h2 id="titulo-resumen-mensual">Ingresos y gastos por mes</h2>
+        <p class="caption">Vista de efectivo real: las tarjetas se cuentan en el mes de pago.
+          Gastos totales = gastos personales + deudas y obligaciones; ahorro e inversiones se muestran aparte.</p>
+        <div class="resumen-mensual-filtros">
+          <label for="mensual-desde">Desde
+            <select id="mensual-desde"></select>
+          </label>
+          <label for="mensual-hasta">Hasta
+            <select id="mensual-hasta"></select>
+          </label>
+        </div>
+        <div id="mensual-resultados" aria-live="polite">Cargando resumen mensual…</div>
+      </section>
+
       <div id="resumen-contenido">Cargando datos del Sheet…</div>
     `;
 
@@ -78,6 +93,7 @@ const PaginaResumen = (() => {
       const contenido = container.querySelector("#resumen-contenido");
       try {
         const datos = await cargarDatos();
+        renderTablaMensual(container.querySelector("#resumen-mensual"), datos.resumenMensual);
         const alcance = alcanceActual();
         const anioSel = parseInt(selAnio.value, 10);
         const mesSel = parseInt(selMes.value, 10);
@@ -181,11 +197,74 @@ const PaginaResumen = (() => {
         renderTendencia(contenido.querySelector("#resumen-tendencia"), datos.resumenMensual);
       } catch (err) {
         contenido.innerHTML = `<div class="error">Error cargando el Sheet: ${err.message}</div>`;
+        container.querySelector("#mensual-resultados").textContent = "No se pudo cargar el resumen mensual.";
         console.error(err);
       }
     }
 
     renderContenido();
+  }
+
+  function renderTablaMensual(seccion, resumenMensual) {
+    const hoy = new Date();
+    const mesActual = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}`;
+    const columnas = ["IngresosGanados", "GastosPersonales", "DeudasObligaciones", "AhorroInversiones", "DisponibleMes"];
+    // La hoja contiene meses futuros con fórmulas en cero; solo ofrecemos
+    // meses con movimientos y nunca meses posteriores al actual.
+    const filas = resumenMensual
+      .filter((f) => /^\d{4}-(0[1-9]|1[0-2])$/.test(String(f.Mes)) && f.Mes <= mesActual && columnas.some((c) => toNumber(f[c]) !== 0))
+      .sort((a, b) => a.Mes.localeCompare(b.Mes));
+    const resultados = seccion.querySelector("#mensual-resultados");
+    if (!filas.length) {
+      resultados.innerHTML = "<p class=\"caption\">Aún no hay meses con movimientos en el Resumen Mensual.</p>";
+      return;
+    }
+
+    const desde = seccion.querySelector("#mensual-desde");
+    const hasta = seccion.querySelector("#mensual-hasta");
+    const etiquetaMes = (mes) => `${MESES_NOMBRE[Number(mes.slice(5, 7))]} ${mes.slice(0, 4)}`;
+    if (!desde.options.length) {
+      for (const f of filas) {
+        desde.add(new Option(etiquetaMes(f.Mes), f.Mes));
+        hasta.add(new Option(etiquetaMes(f.Mes), f.Mes));
+      }
+      desde.value = filas[Math.max(0, filas.length - 6)].Mes;
+      hasta.value = filas[filas.length - 1].Mes;
+      desde.addEventListener("change", () => {
+        if (desde.value > hasta.value) hasta.value = desde.value;
+        actualizarTabla();
+      });
+      hasta.addEventListener("change", () => {
+        if (hasta.value < desde.value) desde.value = hasta.value;
+        actualizarTabla();
+      });
+    }
+
+    function actualizarTabla() {
+      const visibles = filas.filter((f) => f.Mes >= desde.value && f.Mes <= hasta.value);
+      const importes = (f) => {
+        const ingresos = toNumber(f.IngresosGanados);
+        const gastos = toNumber(f.GastosPersonales);
+        const deudas = toNumber(f.DeudasObligaciones);
+        return [ingresos, gastos, deudas, gastos + deudas, toNumber(f.AhorroInversiones), toNumber(f.DisponibleMes)];
+      };
+      const promedios = Array(6).fill(0);
+      for (const f of visibles) importes(f).forEach((valor, i) => { promedios[i] += valor / visibles.length; });
+      const valores = (items) => items.map((valor) => `<td>${fmtMoneda(valor)}</td>`).join("");
+      resultados.innerHTML = `
+        <p class="caption">${visibles.length} ${visibles.length === 1 ? "mes con movimientos" : "meses con movimientos"} en el período seleccionado.</p>
+        <div class="metric-row resumen-mensual-promedios">
+          ${metric("Ingreso promedio mensual", fmtMoneda(promedios[0]))}
+          ${metric("Gasto promedio mensual", fmtMoneda(promedios[3]))}
+          ${metric("Disponible promedio mensual", fmtMoneda(promedios[5]))}
+        </div>
+        <div class="tabla-scroll"><table class="tabla" id="tabla-resumen-mensual">
+          <thead><tr><th>Mes</th><th>Ingresos</th><th>Gastos personales</th><th>Deudas y obligaciones</th><th>Gastos totales</th><th>Ahorro e inversiones</th><th>Disponible</th></tr></thead>
+          <tbody>${visibles.map((f) => `<tr><th scope="row">${etiquetaMes(f.Mes)}</th>${valores(importes(f))}</tr>`).join("")}</tbody>
+          <tfoot><tr><th scope="row">Promedio mensual</th>${valores(promedios)}</tr></tfoot>
+        </table></div>`;
+    }
+    actualizarTabla();
   }
 
   // Puerto del bloque "Tendencia de los últimos meses" dentro de render_resumen().
