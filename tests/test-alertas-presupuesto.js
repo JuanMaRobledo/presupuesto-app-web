@@ -79,7 +79,15 @@ async function testAlertasPresupuesto() {
   check(dispPasado.includes("⚠️") && dispPasado.includes("de más"),
     `Meta 100.000 con 120% usado: aviso rojo "de más" (vi: "${dispPasado}")`);
   const colorPasado = await page.locator("#disp_10 span").evaluate((el) => getComputedStyle(el).color);
-  check(colorPasado === "rgb(220, 38, 38)", `El aviso "pasado" usa el color rojo esperado (vi: "${colorPasado}")`);
+  const colorError = await page.evaluate(() => {
+    const probe = document.createElement("span");
+    probe.style.color = "var(--error)";
+    document.body.appendChild(probe);
+    const esperado = getComputedStyle(probe).color;
+    probe.remove();
+    return esperado;
+  });
+  check(colorPasado === colorError, `El aviso "pasado" usa el color de error del tema (vi: "${colorPasado}", esperado: "${colorError}")`);
 
   // Cambiar la meta a mano recalcula el aviso en vivo (sin recargar el Sheet).
   await page.fill("#meta_cat_8", "40000"); // ahora 50.000 real > 40.000 meta -> pasa a "de más"
