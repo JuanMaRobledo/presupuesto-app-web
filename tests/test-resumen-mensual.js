@@ -102,6 +102,30 @@ async function gotoLoggedIn(page) {
   check(!filasTendenciaVisibles.includes("todavía no está portado"), "Resumen: ya no muestra el aviso de 'no portado'");
   check(esperadoTendencia.length === 12, `(sanity) el mock produce 12 meses tras filtrar+recortar (vi: ${esperadoTendencia.length})`);
 
+  // Resumen: tabla y promedio de los meses escogidos, independiente del
+  // alcance usado para los indicadores históricos de la página.
+  const mesDesde = await page.locator("#mensual-desde").inputValue();
+  const mesHasta = await page.locator("#mensual-hasta").inputValue();
+  check(mesDesde === "2025-08" && mesHasta === "2026-01",
+    `Resumen mensual: muestra por defecto los seis últimos meses con movimientos (${mesDesde} a ${mesHasta})`);
+  check(await page.locator("#tabla-resumen-mensual tbody tr").count() === 6,
+    "Resumen mensual: muestra seis filas y excluye el mes futuro sin movimientos");
+  let promedios = await page.locator("#tabla-resumen-mensual tfoot").innerText();
+  check(promedios.includes("$2,950,000") && promedios.includes("$1,375,000"),
+    `Resumen mensual: calcula ingresos y gastos promedio de seis meses (${promedios.replace(/\n/g, " | ")})`);
+
+  await page.selectOption("#mensual-desde", "2025-01");
+  await page.selectOption("#mensual-hasta", "2025-03");
+  check(await page.locator("#tabla-resumen-mensual tbody tr").count() === 3,
+    "Resumen mensual: permite elegir un intervalo de tres meses");
+  promedios = await page.locator("#tabla-resumen-mensual tfoot").innerText();
+  check(promedios.includes("$2,100,000") && promedios.includes("$950,000"),
+    `Resumen mensual: recalcula promedios solo con el período seleccionado (${promedios.replace(/\n/g, " | ")})`);
+  await page.check('input[name="alcance"][value="anio"]');
+  check(await page.locator("#mensual-desde").inputValue() === "2025-01" &&
+    await page.locator("#tabla-resumen-mensual tbody tr").count() === 3,
+    "Resumen mensual: conserva su selección al cambiar el alcance de los indicadores");
+
   // ---------------------------------------------------------------------
   // Análisis -> Evolución
   // ---------------------------------------------------------------------

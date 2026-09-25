@@ -337,6 +337,26 @@ details summary:hover { color: var(--accent-hover); }
 .tabla th, .tabla td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); }
 .tabla th { color: var(--text-muted); font-weight: 500; }
 
+.resumen-mensual {
+  margin: 22px 0 28px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-alt);
+  box-shadow: var(--shadow-card);
+}
+.resumen-mensual h2 { margin: 0 0 6px; font-size: 1.25rem; }
+.resumen-mensual-filtros { display: flex; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+.resumen-mensual-filtros label { display: grid; gap: 5px; font-size: 0.85rem; font-weight: 600; }
+.resumen-mensual-filtros select { min-width: 160px; padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); }
+.resumen-mensual-promedios { margin: 12px 0; }
+.resumen-mensual .tabla-scroll { max-height: 440px; }
+.resumen-mensual .tabla { min-width: 850px; font-variant-numeric: tabular-nums; }
+.resumen-mensual .tabla th, .resumen-mensual .tabla td { white-space: nowrap; }
+.resumen-mensual .tabla td { text-align: right; }
+.resumen-mensual .tabla tfoot { background: var(--bg); font-weight: 700; }
+.resumen-mensual .tabla tfoot th, .resumen-mensual .tabla tfoot td { position: sticky; bottom: 0; border-top: 2px solid var(--border); }
+
 @media (max-width: 700px) {
   #app { flex-direction: column; }
   #sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border); }
