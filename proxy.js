@@ -1,56 +1,14 @@
-import { createHash, timingSafeEqual } from "node:crypto";
 import { next } from "@vercel/functions";
-
-function safeEqual(value, expected) {
-  const valueHash = createHash("sha256").update(value).digest();
-  const expectedHash = createHash("sha256").update(expected).digest();
-  return timingSafeEqual(valueHash, expectedHash);
-}
-
-function unauthorized() {
-  return new Response("Usuario o contraseña incorrectos.", {
-    status: 401,
-    headers: {
-      "Cache-Control": "no-store",
-      "WWW-Authenticate": 'Basic realm="Presupuesto personal", charset="UTF-8"',
-    },
-  });
-}
+import { validSession } from "./sso-session.js";
 
 export default function proxy(request) {
-  const expectedUser = process.env.APP_USERNAME?.trim();
-  const expectedPassword = process.env.APP_PASSWORD;
-
-  if (!expectedUser || !expectedPassword) {
-    return new Response("El acceso privado todavía no está configurado.", {
-      status: 503,
-      headers: { "Cache-Control": "no-store" },
-    });
-  }
-
-  const authorization = request.headers.get("authorization") || "";
-  if (!authorization.startsWith("Basic ")) return unauthorized();
-
-  let decoded;
-  try {
-    decoded = Buffer.from(authorization.slice(6), "base64").toString("utf8");
-  } catch {
-    return unauthorized();
-  }
-
-  const separator = decoded.indexOf(":");
-  if (separator < 0) return unauthorized();
-
-  const username = decoded.slice(0, separator);
-  const password = decoded.slice(separator + 1);
-  if (!safeEqual(username, expectedUser) || !safeEqual(password, expectedPassword)) {
-    return unauthorized();
-  }
-
-  return next({
-    headers: {
-      "Cache-Control": "private, no-store",
-      "Set-Cookie": "jmr-server-auth=1; Path=/; Secure; SameSite=Strict; Max-Age=2592000",
-    },
-  });
+  const url = new URL(request.url);
+  if (url.pathname === "/api/sso") return next();
+  if (!process.env.APP_PASSWORD) return new Response("El acceso privado todavía no está configurado.", { status: 503, headers: { "Cache-Control": "no-store" } });
+  if (validSession(request.headers.get("cookie"))) return next({ headers: { "Cache-Control": "private, no-store" } });
+  if (!request.headers.get("accept")?.includes("text/html")) return new Response("No autorizado", { status: 401, headers: { "Cache-Control": "no-store" } });
+  const destination = new URL("https://cartera-two-eta.vercel.app/api/sso/start");
+  destination.searchParams.set("app", "presupuesto");
+  destination.searchParams.set("path", url.pathname + url.search);
+  return Response.redirect(destination, 303);
 }

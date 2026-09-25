@@ -13,6 +13,17 @@ cuenta de servicio, no hay ninguna llave guardada en el código. El PDF de
 cada declaración se sube directo a Google Drive con esa misma sesión (queda
 de tu propiedad, la app nunca lo aloja).
 
+## Ingreso al Centro Financiero
+
+La versión de Vercel (`https://presupuesto-app-web.vercel.app/`) utiliza el
+usuario y contraseña de [JMR · Centro Financiero](https://cartera-two-eta.vercel.app/).
+Un código de un solo uso habilita una sesión privada en este dominio; al
+abrir un enlace directo se vuelve al ingreso central y después a la página
+solicitada. Configura `APP_PASSWORD` en este proyecto de Vercel para firmar
+sesiones locales. El service worker no almacena páginas privadas. La autorización posterior de Google sigue siendo necesaria
+para acceder a las hojas de cálculo del usuario; es independiente del ingreso
+al Centro Financiero. GitHub Pages publica una copia estática sin este proxy.
+
 La carpeta `streamlit-app-original/` es una copia congelada de la app de
 Streamlit (para no perder ese trabajo) — no se usa para nada acá, es solo
 referencia/backup. La versión de Streamlit sigue viva y desplegada en
